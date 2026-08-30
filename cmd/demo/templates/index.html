@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>go-dbexplorer WASM demo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+</head>
+<body>
+  <section class="section">
+    <div class="container">
+      <h1 class="title">go-dbexplorer</h1>
+      <p class="subtitle is-6">WASM demo — a pglike (SQLite) database running entirely in your
+        browser, seeded with a sample lending library.
+        <a href="https://git.bytestone.uk/hum3/go-dbexplorer">Source</a></p>
+      <div id="content"><progress class="progress is-small is-primary" max="100">Loading WASM…</progress></div>
+    </div>
+  </section>
+  <script src="wasm_exec.js"></script>
+  <script>
+    const content = document.getElementById("content");
+    function nav(url) {
+      content.innerHTML = goRender(url);
+      window.scrollTo(0, 0);
+    }
+    content.addEventListener("click", (e) => {
+      const a = e.target.closest("a");
+      if (!a || !content.contains(a)) return;
+      const href = a.getAttribute("href");
+      if (href === null || href.startsWith("http")) return;
+      e.preventDefault();
+      nav(href);
+    });
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((r) => {
+      go.run(r.instance);
+      nav("/");
+    }).catch((err) => {
+      content.innerHTML = '<p class="has-text-danger">Failed to load WASM: ' + err + "</p>";
+    });
+  </script>
+</body>
+</html>

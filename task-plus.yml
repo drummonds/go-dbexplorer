@@ -1,0 +1,10 @@
+remotes:
+  - name: origin
+    forge: forgejo
+  - name: github
+    forge: github
+pages_build:
+  - task docs:build
+pages_deploy:
+  - type: rsync
+    site: go-dbexplorer

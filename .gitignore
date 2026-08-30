@@ -1,0 +1,6 @@
+docs/
+task-plus.local.yaml
+.task/
+*.wasm
+.claude/settings.local.json
+.tp-release-comment
