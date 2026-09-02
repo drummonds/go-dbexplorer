@@ -39,6 +39,11 @@ async function main() {
 		await new Promise((r) => setTimeout(r, 50));
 	}
 	assert(typeof globalThis.goRender === 'function', 'goRender registered');
+	assert(typeof globalThis.goVersion === 'function', 'goVersion registered');
+	const ver = goVersion();
+	assert(typeof ver === 'string' && ver.length > 0 && ver !== 'dev', 'goVersion reports a version: ' + ver);
+	assert(/committed \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/.test(ver), 'goVersion includes commit timestamp: ' + ver);
+	console.log('  version:', ver);
 
 	const index = goRender('/');
 	assert(index.includes('DB Explorer'), 'index has title');
@@ -52,6 +57,24 @@ async function main() {
 	assert(books.includes('Foreign Keys'), 'books page has FKs');
 	assert(books.includes('Indexes'), 'books page has indexes');
 	assert(books.includes('Ancillary Justice'), 'books sorted asc starts with Ancillary');
+
+	// UUID keys are shortened with the full value in the tooltip, FK cells
+	// link to the referenced table filtered on the key, timestamps use the
+	// demo's format, and NULLs render as NULL.
+	const m = books.match(/<td title="([0-9a-f-]{36})">([0-9a-f]{8})&hellip;<\/td>/);
+	assert(m !== null, 'books page shows shortened UUIDs with full value in title');
+	const fk = books.match(/<td title="([0-9a-f-]{36})"><a href="\/authors\?filter=id&value=\1">[0-9a-f]{8}&hellip;<\/a><\/td>/);
+	assert(fk !== null, 'author_id cells link to /authors?filter=id&value=<uuid>');
+	if (fk) {
+		const author = goRender('/authors?filter=id&value=' + fk[1]);
+		assert(author.includes('Data (1 rows)'), 'filtered authors page shows one row');
+		assert(author.includes('Filter: id = ' + fk[1]), 'filtered authors page shows the filter');
+		assert(author.includes('clear filter'), 'filtered authors page offers to clear the filter');
+	}
+	const loans1 = goRender('/loans');
+	assert(/<td>2026-\d{2}-\d{2} \d{2}:\d{2}<\/td>/.test(loans1), 'timestamps use the demo TimeFormat');
+	assert(loans1.includes('>NULL</td>'), 'open loans show NULL for returned');
+	assert(!loans1.includes('<nil>'), 'no raw <nil> in output');
 
 	const loans = goRender('/loans?page=2');
 	assert(loans.includes('Table: loans'), 'loans page 2 renders');

@@ -12,7 +12,8 @@
       <h1 class="title">go-dbexplorer</h1>
       <p class="subtitle is-6">WASM demo — a pglike (SQLite) database running entirely in your
         browser, seeded with a sample lending library.
-        <a href="https://git.bytestone.uk/hum3/go-dbexplorer">Source</a></p>
+        <a href="https://git.bytestone.uk/hum3/go-dbexplorer">Source</a>
+        &middot; <span id="version">loading&hellip;</span></p>
       <div id="content"><progress class="progress is-small is-primary" max="100">Loading WASM…</progress></div>
     </div>
   </section>
@@ -34,6 +35,7 @@
     const go = new Go();
     WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((r) => {
       go.run(r.instance);
+      document.getElementById("version").textContent = goVersion();
       nav("/");
     }).catch((err) => {
       content.innerHTML = '<p class="has-text-danger">Failed to load WASM: ' + err + "</p>";

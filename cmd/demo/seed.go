@@ -4,11 +4,31 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math/rand/v2"
 )
 
+// newUUIDs returns n version-4-shaped UUIDs from a fixed-seed generator, so
+// the demo shows the same ids on every run.
+func newUUIDs(rng *rand.Rand, n int) []string {
+	ids := make([]string, n)
+	for i := range ids {
+		var b [16]byte
+		for j := range b {
+			b[j] = byte(rng.UintN(256))
+		}
+		b[6] = (b[6] & 0x0f) | 0x40 // version 4
+		b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
+		ids[i] = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	}
+	return ids
+}
+
 // seedSampleDB creates and fills a small lending-library schema — enough
-// tables, foreign keys and indexes to show every explorer feature. Safe to
-// call on a database where the tables already exist (it skips seeding).
+// tables, foreign keys and indexes to show every explorer feature. All keys
+// are UUIDs, generated deterministically here (the DEFAULT covers rows
+// added by hand; pglike accepts the bare PostgreSQL form since go-postgres
+// v0.5.12). Safe to call on a database where the tables already exist (it
+// skips seeding).
 func seedSampleDB(db *sql.DB) {
 	var n int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM books`).Scan(&n); err == nil && n > 0 {
@@ -17,25 +37,25 @@ func seedSampleDB(db *sql.DB) {
 
 	ddl := []string{
 		`CREATE TABLE IF NOT EXISTS authors (
-			id SERIAL PRIMARY KEY,
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			name TEXT NOT NULL,
 			born INTEGER)`,
 		`CREATE TABLE IF NOT EXISTS members (
-			id SERIAL PRIMARY KEY,
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			name TEXT NOT NULL,
 			joined TIMESTAMP NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS books (
-			id SERIAL PRIMARY KEY,
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			title TEXT NOT NULL,
-			author_id INTEGER NOT NULL REFERENCES authors(id),
+			author_id UUID NOT NULL REFERENCES authors(id),
 			published INTEGER,
 			isbn VARCHAR(17))`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn)`,
 		`CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id)`,
 		`CREATE TABLE IF NOT EXISTS loans (
-			id SERIAL PRIMARY KEY,
-			book_id INTEGER NOT NULL REFERENCES books(id),
-			member_id INTEGER NOT NULL REFERENCES members(id),
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			book_id UUID NOT NULL REFERENCES books(id),
+			member_id UUID NOT NULL REFERENCES members(id),
 			borrowed TIMESTAMP NOT NULL,
 			returned TIMESTAMP)`,
 		`CREATE INDEX IF NOT EXISTS idx_loans_book ON loans(book_id)`,
@@ -48,6 +68,8 @@ func seedSampleDB(db *sql.DB) {
 		}
 	}
 
+	rng := rand.New(rand.NewPCG(20260902, 1))
+
 	authors := []struct {
 		name string
 		born int
@@ -56,8 +78,10 @@ func seedSampleDB(db *sql.DB) {
 		{"Terry Pratchett", 1948}, {"Ann Leckie", 1966}, {"Stanisław Lem", 1921},
 		{"Connie Willis", 1945}, {"Gene Wolfe", 1931},
 	}
-	for _, a := range authors {
-		if _, err := db.Exec(`INSERT INTO authors (name, born) VALUES ($1, $2)`, a.name, a.born); err != nil {
+	authorIDs := newUUIDs(rng, len(authors))
+	for i, a := range authors {
+		if _, err := db.Exec(`INSERT INTO authors (id, name, born) VALUES ($1, $2, $3)`,
+			authorIDs[i], a.name, a.born); err != nil {
 			log.Printf("seed authors: %v", err)
 			return
 		}
@@ -65,7 +89,7 @@ func seedSampleDB(db *sql.DB) {
 
 	books := []struct {
 		title  string
-		author int
+		author int // 1-based index into authors
 		year   int
 	}{
 		{"The Dispossessed", 1, 1974}, {"The Left Hand of Darkness", 1, 1969},
@@ -78,18 +102,21 @@ func seedSampleDB(db *sql.DB) {
 		{"Doomsday Book", 7, 1992}, {"To Say Nothing of the Dog", 7, 1997},
 		{"The Shadow of the Torturer", 8, 1980}, {"The Claw of the Conciliator", 8, 1981},
 	}
+	bookIDs := newUUIDs(rng, len(books))
 	for i, b := range books {
 		isbn := fmt.Sprintf("978-0-000-%05d-%d", i+1, (i*7)%10)
-		if _, err := db.Exec(`INSERT INTO books (title, author_id, published, isbn) VALUES ($1, $2, $3, $4)`,
-			b.title, b.author, b.year, isbn); err != nil {
+		if _, err := db.Exec(`INSERT INTO books (id, title, author_id, published, isbn) VALUES ($1, $2, $3, $4, $5)`,
+			bookIDs[i], b.title, authorIDs[b.author-1], b.year, isbn); err != nil {
 			log.Printf("seed books: %v", err)
 			return
 		}
 	}
 
-	for i := 1; i <= 12; i++ {
-		if _, err := db.Exec(`INSERT INTO members (name, joined) VALUES ($1, $2)`,
-			fmt.Sprintf("Member %02d", i),
+	const nMembers = 12
+	memberIDs := newUUIDs(rng, nMembers)
+	for i, id := range memberIDs {
+		if _, err := db.Exec(`INSERT INTO members (id, name, joined) VALUES ($1, $2, $3)`,
+			id, fmt.Sprintf("Member %02d", i+1),
 			fmt.Sprintf("2025-%02d-01 10:00:00", (i%12)+1)); err != nil {
 			log.Printf("seed members: %v", err)
 			return
@@ -97,24 +124,21 @@ func seedSampleDB(db *sql.DB) {
 	}
 
 	// Deterministic pseudo-random loans; some still out (returned IS NULL).
-	for i := range 120 {
-		book := (i*13)%len(books) + 1
-		member := (i*7)%12 + 1
+	const nLoans = 120
+	loanIDs := newUUIDs(rng, nLoans)
+	for i := range nLoans {
+		book := bookIDs[(i*13)%len(books)]
+		member := memberIDs[(i*7)%nMembers]
 		day := (i % 27) + 1
 		borrowed := fmt.Sprintf("2026-%02d-%02d 14:00:00", (i%12)+1, day)
-		if i%5 == 0 {
-			if _, err := db.Exec(`INSERT INTO loans (book_id, member_id, borrowed) VALUES ($1, $2, $3)`,
-				book, member, borrowed); err != nil {
-				log.Printf("seed loans: %v", err)
-				return
-			}
-		} else {
-			returned := fmt.Sprintf("2026-%02d-%02d 09:30:00", (i%12)+1, day+2)
-			if _, err := db.Exec(`INSERT INTO loans (book_id, member_id, borrowed, returned) VALUES ($1, $2, $3, $4)`,
-				book, member, borrowed, returned); err != nil {
-				log.Printf("seed loans: %v", err)
-				return
-			}
+		var returned any
+		if i%5 != 0 {
+			returned = fmt.Sprintf("2026-%02d-%02d 09:30:00", (i%12)+1, day+2)
+		}
+		if _, err := db.Exec(`INSERT INTO loans (id, book_id, member_id, borrowed, returned) VALUES ($1, $2, $3, $4, $5)`,
+			loanIDs[i], book, member, borrowed, returned); err != nil {
+			log.Printf("seed loans: %v", err)
+			return
 		}
 	}
 }

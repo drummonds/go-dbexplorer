@@ -1,5 +1,14 @@
 version: '3'
 
+vars:
+  # Stamped into the demo binaries (see cmd/demo/version.go). Pass
+  # VERSION=vX.Y.Z to override the tag, as tp release does.
+  GIT_VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  COMMIT_TIME:
+    sh: git log -1 --format=%cI 2>/dev/null || true
+  LDFLAGS: -X main.version={{.VERSION | default .GIT_VERSION}} -X main.commitTime={{.COMMIT_TIME}}
+
 tasks:
   default:
     desc: List available tasks
@@ -30,18 +39,15 @@ tasks:
   demo:
     desc: Run the demo server on pglike (add DBEXPLORER_PG_DSN or -- -dsn for PostgreSQL)
     cmds:
-      - go run ./cmd/demo {{.CLI_ARGS}}
+      - go run -ldflags "{{.LDFLAGS}}" ./cmd/demo {{.CLI_ARGS}}
 
   docs:build:
     desc: Build the WASM demo into docs/
-    vars:
-      GIT_TAG:
-        sh: '[ -n "{{.VERSION}}" ] && echo "{{.VERSION}}" || git describe --tags --always 2>/dev/null || echo dev'
     cmds:
       - mkdir -p docs
-      - GOOS=js GOARCH=wasm go build -o docs/main.wasm ./cmd/demo
+      - GOOS=js GOARCH=wasm go build -ldflags "{{.LDFLAGS}}" -o docs/main.wasm ./cmd/demo
       - cp "$(find $(go env GOROOT) -name wasm_exec.js -print -quit)" docs/
-      - sed 's/go-dbexplorer WASM demo/go-dbexplorer {{.GIT_TAG}}/' cmd/demo/templates/index.html > docs/index.html
+      - cp cmd/demo/templates/index.html docs/index.html
       - task-plus md2html --file README.md --dst docs
       - task-plus md2html --file CHANGELOG.md --dst docs
 
