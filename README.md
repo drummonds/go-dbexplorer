@@ -6,15 +6,19 @@ sortable, filterable data browser with foreign-key links and configurable
 column formatting. Extracted from the
 [gobank](https://git.bytestone.uk/hum3/gobank) Model Bank demo.
 
-Two catalog dialects are supported:
+The explorer is PostgreSQL-specific: it reads `information_schema` and
+`pg_indexes` and uses `$1` placeholders. One query path serves three
+deployments:
 
-- **PostgreSQL** — `pg_tables`, `information_schema`, `pg_indexes`
-- **SQLite-style** — `sqlite_master` + `PRAGMA`, as exposed by
+- **PostgreSQL** proper, opened with `pgx`
+- **SQLite file or in-memory**, opened with
   [go-postgres](https://git.bytestone.uk/hum3/go-postgres)'s `pglike`
-  driver (PostgreSQL SQL on SQLite, including in WASM)
+  driver, which speaks PostgreSQL SQL over SQLite and installs the same
+  catalog views on every connection
+- **WASM**, the same pglike database running entirely in the browser
 
 The emitted HTML uses [Bulma](https://bulma.io/) class names; pages render
-unstyled without it.
+unstyled without it. Every identifier and value is HTML-escaped.
 
 ## Library
 
@@ -22,8 +26,7 @@ unstyled without it.
 import dbexplorer "git.bytestone.uk/hum3/go-dbexplorer"
 
 ex := &dbexplorer.Explorer{
-    DB:         db,                   // *sql.DB
-    Postgres:   true,                 // false = pglike/SQLite catalogs
+    DB:         db,                   // *sql.DB opened with pgx or pglike
     BasePath:   "/internal/explorer", // prefix for emitted links
     UUIDLen:    8,                    // show UUIDs as 8 chars + …, full in tooltip
     TimeFormat: "2006-01-02 15:04",   // Go layout for time.Time cells
@@ -70,15 +73,19 @@ string carries `page`, `sort`, `dir`, `trunc`, and `filter`/`value`.
 ## Demo
 
 The demo explores a sample lending-library database (authors, books,
-members, loans — UUID keys, foreign keys and indexes included), in either
-backend:
+members, loans — UUID keys, foreign keys and indexes included), on any of
+the backends:
 
 ```sh
 task demo                                   # pglike, in-memory: http://localhost:8080/
+task demo -- -dsn /tmp/library.db           # pglike on a SQLite file (seeds if absent)
 task demo -- -dsn postgres://user:pw@host/db  # real PostgreSQL (seeds if absent)
-DBEXPLORER_PG_DSN=postgres://... task demo    # same, via env
+DBEXPLORER_DSN=postgres://... task demo       # same, via env
 task demo -- -uuid-len 0 -time-format "02 Jan 2006"  # column formatting
 ```
+
+A `postgres://` or `postgresql://` DSN opens PostgreSQL through pgx; any
+other non-empty DSN is handed to pglike as a SQLite file path.
 
 The WASM version runs the identical database and explorer entirely in the
 browser (`task docs:build`, then serve `docs/`); it is published at
@@ -94,4 +101,17 @@ on every build, so each commit is reflected automatically; pass
 ## Tests
 
 `task test` runs against pglike; set `DBEXPLORER_PG_DSN` to run the same
-assertions against real PostgreSQL as well.
+assertions against real PostgreSQL as well, for example with a throwaway
+container:
+
+```sh
+podman run -d --rm --name pg -e POSTGRES_HOST_AUTH_METHOD=trust \
+  -e POSTGRES_DB=dbexplorer_test -p 127.0.0.1:55432:5432 docker.io/library/postgres:16-alpine
+DBEXPLORER_PG_DSN="postgres://postgres@127.0.0.1:55432/dbexplorer_test?sslmode=disable" task test
+podman stop pg
+```
+
+The WASM soak test (`task test:wasm:soak`, moved from lofidb) fills a
+pglike `:memory:` database under wasip1 via wazero, records heap use as
+JSON lines (`WASM_SOAK_ROWS`, `WASM_SOAK_OUTPUT`) and checks the explorer
+still renders the table. See ROADMAP.md for what is planned.

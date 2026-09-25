@@ -4,3 +4,4 @@ task-plus.local.yaml
 *.wasm
 .claude/settings.local.json
 .tp-release-comment
+.vscode/

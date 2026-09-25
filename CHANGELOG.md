@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+ - Supersedes [lofidb](https://git.bytestone.uk/hum3/lofidb), now archived:
+   its roadmap moved to ROADMAP.md and its WASM data-size soak test to
+   `wasm_soak_test.go` (`task test:wasm:soak`, wasip1 via wazero), which
+   now also checks the explorer renders the soaked table.
+ - PostgreSQL only. The catalog is read through a single
+   `information_schema`/`pg_indexes` query path that runs unchanged on
+   real PostgreSQL and on go-postgres's pglike driver (SQLite file,
+   in-memory, WASM), which installs views of the same shape. The
+   `Explorer.Postgres` flag and the SQLite PRAGMA branch are gone; index
+   columns and uniqueness are parsed from `indexdef` on both backends, and
+   the index table no longer shows an Origin column.
+ - Table names, column names, types, foreign-key targets and constraint
+   rules are now HTML-escaped wherever they are rendered as text.
+   Previously only defaults, index names and cell values were.
+ - Demo: `-dsn` (or `DBEXPLORER_DSN`) accepts a SQLite file path, opened
+   with pglike; `postgres://` DSNs still go to pgx. `DBEXPLORER_PG_DSN`
+   remains honoured.
  - Data browser: foreign-key cells link to the referenced table filtered to
    that key. New `filter`/`value` query parameters (parameterised, column
    validated) and `TableHTMLWith(name, TableOptions)`; `TableHTML` keeps
