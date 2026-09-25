@@ -162,7 +162,7 @@ func insertBatch(db *sql.DB, offset, n int, payload string) error {
 		tx.Rollback()
 		return err
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		id := offset + i
 		k := fmt.Sprintf("k-%010d", id)
 		if _, err := stmt.Exec(id, k, payload, time.Now().Format(time.RFC3339)); err != nil {
