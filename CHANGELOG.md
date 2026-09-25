@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-25
+
+ - First release. Supersedes lofidb: roadmap and WASM soak test moved here; PostgreSQL-only catalog path over pgx and pglike; FK links, column filters, column formatting
+
  - Supersedes [lofidb](https://git.bytestone.uk/hum3/lofidb), now archived:
    its roadmap moved to ROADMAP.md and its WASM data-size soak test to
    `wasm_soak_test.go` (`task test:wasm:soak`, wasip1 via wazero), which
