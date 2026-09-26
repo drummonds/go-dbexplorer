@@ -253,3 +253,38 @@ func TestForeignKeyLinksAndFilter(t *testing.T) {
 		})
 	}
 }
+
+// Views are listed and browsable alongside tables, and an Annotate hook
+// lets the host label each object (an owner, a contract badge) in the
+// index.
+func TestViewsListedAndAnnotated(t *testing.T) {
+	for backend, e := range backends(t) {
+		t.Run(backend, func(t *testing.T) {
+			if _, err := e.DB.Exec(`CREATE VIEW contract_books AS SELECT b.title, a.name AS author FROM books b JOIN authors a ON a.id = b.author_id`); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { e.DB.Exec(`DROP VIEW contract_books`) })
+			e.Annotate = func(name string) string {
+				if strings.HasPrefix(name, "contract_") {
+					return `<span class="tag">contract</span>`
+				}
+				return `<span class="tag">internal</span>`
+			}
+			if views := e.Views(); len(views) != 1 || views[0] != "contract_books" {
+				t.Fatalf("Views() = %v, want [contract_books]", views)
+			}
+			index := e.IndexHTML()
+			for _, want := range []string{"contract_books", `<span class="tag">contract</span>`, `<span class="tag">internal</span>`} {
+				if !strings.Contains(index, want) {
+					t.Errorf("index missing %q", want)
+				}
+			}
+			page := e.TableHTML("contract_books", 1, "", "", false)
+			for _, want := range []string{"Excession", "author"} {
+				if !strings.Contains(page, want) {
+					t.Errorf("view page missing %q", want)
+				}
+			}
+		})
+	}
+}

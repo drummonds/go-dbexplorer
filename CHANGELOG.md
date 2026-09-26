@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- `Views()` lists the database's views; the index shows them in their own
+  box and they browse like tables.
+- `Annotate` hook: an HTML fragment (a badge, say) shown beside each table
+  or view name in the index, so a host can label ownership.
+
 ## [0.1.1] - 2026-09-26
 
  - Cleaning

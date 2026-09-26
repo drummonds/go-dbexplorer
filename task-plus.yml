@@ -1,4 +1,4 @@
-retract_reviewed: v0.1.0
+retract_reviewed: v0.1.1
 remotes:
   - name: origin
     forge: forgejo

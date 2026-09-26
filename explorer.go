@@ -47,6 +47,9 @@ type Explorer struct {
 	// Return the display text and true to use it; false falls through to the
 	// built-in UUID/time/truncation formatting.
 	Format func(table, column string, v any) (string, bool)
+	// Annotate, when set, returns an HTML fragment (a badge, say) shown
+	// beside each table or view name in the index. It is emitted as-is.
+	Annotate func(name string) string
 }
 
 // TableOptions selects what TableHTMLWith renders for a table.
@@ -174,6 +177,42 @@ func (e *Explorer) Tables() []string {
 		}
 	}
 	return tables
+}
+
+// Views returns all user view names.
+func (e *Explorer) Views() []string {
+	if e.DB == nil {
+		return nil
+	}
+	q := `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`
+	if e.Postgres {
+		q = `SELECT viewname FROM pg_views WHERE schemaname = 'public' ORDER BY viewname`
+	}
+	rows, err := e.DB.Query(q)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var views []string
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) == nil {
+			views = append(views, name)
+		}
+	}
+	return views
+}
+
+// annotation is the Annotate fragment for a name, with a leading space, or
+// nothing when no hook is set.
+func (e *Explorer) annotation(name string) string {
+	if e.Annotate == nil {
+		return ""
+	}
+	if a := e.Annotate(name); a != "" {
+		return " " + a
+	}
+	return ""
 }
 
 // tableColumns returns the columns of a table in definition order.
@@ -367,12 +406,32 @@ func (e *Explorer) IndexHTML() string {
 			rowStr = "error"
 		}
 		colCount := len(e.tableColumns(name))
-		s.WriteString(fmt.Sprintf(`<tr><td><a href="%s">%s</a></td><td class="has-text-right">%d</td><td class="has-text-right">%s</td></tr>`,
-			e.tableURL(name), name, colCount, rowStr))
+		s.WriteString(fmt.Sprintf(`<tr><td><a href="%s">%s</a>%s</td><td class="has-text-right">%d</td><td class="has-text-right">%s</td></tr>`,
+			e.tableURL(name), name, e.annotation(name), colCount, rowStr))
 	}
 
 	s.WriteString(`</tbody></table>`)
 	s.WriteString(`</div>`)
+
+	if views := e.Views(); len(views) > 0 {
+		s.WriteString(`<div class="box">`)
+		s.WriteString(`<h3 class="title is-5">Views</h3>`)
+		s.WriteString(`<table class="table is-fullwidth is-striped">`)
+		s.WriteString(`<thead><tr><th>View</th><th class="has-text-right">Columns</th><th class="has-text-right">Rows</th></tr></thead>`)
+		s.WriteString(`<tbody>`)
+		for _, name := range views {
+			var rowCount int
+			err := e.DB.QueryRow(fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, name)).Scan(&rowCount)
+			rowStr := fmt.Sprintf("%d", rowCount)
+			if err != nil {
+				rowStr = "error"
+			}
+			s.WriteString(fmt.Sprintf(`<tr><td><a href="%s">%s</a>%s</td><td class="has-text-right">%d</td><td class="has-text-right">%s</td></tr>`,
+				e.tableURL(name), name, e.annotation(name), len(e.tableColumns(name)), rowStr))
+		}
+		s.WriteString(`</tbody></table>`)
+		s.WriteString(`</div>`)
+	}
 
 	// Foreign key relationships
 	type fkRef struct {
@@ -523,7 +582,7 @@ func (e *Explorer) TableHTMLWith(name string, o TableOptions) string {
 
 	// Validate table name against actual DB catalog
 	tables := e.Tables()
-	valid := slices.Contains(tables, name)
+	valid := slices.Contains(tables, name) || slices.Contains(e.Views(), name)
 	if !valid {
 		s.WriteString(`<h2 class="title is-4">Table Not Found</h2>`)
 		s.WriteString(fmt.Sprintf(`<p class="has-text-danger">Unknown table: %s</p>`, html.EscapeString(name)))
