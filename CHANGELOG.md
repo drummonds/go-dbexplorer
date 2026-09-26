@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-27
+
 ### Added
 - `Views()` lists the database's views; the index shows them in their own
   box and they browse like tables.
