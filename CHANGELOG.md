@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-26
+
+ - Cleaning
+
 ## [0.1.0] - 2026-09-25
 
  - First release. Supersedes lofidb: roadmap and WASM soak test moved here; PostgreSQL-only catalog path over pgx and pglike; FK links, column filters, column formatting
