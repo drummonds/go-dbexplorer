@@ -1,7 +1,7 @@
 # Roadmap
 
-Carried over from [lofidb](https://git.bytestone.uk/hum3/lofidb) (archived
-2026-09-25), which this library superseded. Items lofidb planned that were
+Carried over from lofidb (archived
+2026-09-25, deleted 2026-09-28), which this library superseded. Items lofidb planned that were
 already delivered here are ticked with the version.
 
 ## Next
