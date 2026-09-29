@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-29
+
+ - Version update
+
 ## [0.2.0] - 2026-09-29
 
  - Remove Explorer.Postgres: both backends use the PostgreSQL catalogs (needs go-postgres v0.6.0)
