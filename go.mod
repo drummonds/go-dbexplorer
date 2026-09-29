@@ -3,7 +3,7 @@ module git.bytestone.uk/hum3/go-dbexplorer
 go 1.26.0
 
 require (
-	git.bytestone.uk/hum3/go-postgres v0.5.13
+	git.bytestone.uk/hum3/go-postgres v0.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 )
 

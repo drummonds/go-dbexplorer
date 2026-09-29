@@ -2,10 +2,10 @@
 // catalog, per-table schema, foreign keys, indexes, and a paginated,
 // sortable data browser — for any database opened through database/sql.
 //
-// Two catalog dialects are understood: real PostgreSQL
-// (pg_tables/information_schema/pg_indexes) and SQLite-style engines such
-// as pglike (sqlite_master/PRAGMA), selected by Explorer.Postgres. The
-// emitted HTML uses Bulma CSS class names and is unstyled without it.
+// Metadata comes from the PostgreSQL catalogs (pg_tables, pg_views,
+// information_schema, pg_indexes), which real PostgreSQL and pglike both
+// provide. The emitted HTML uses Bulma CSS class names and is unstyled
+// without it.
 package dbexplorer
 
 import (
@@ -24,9 +24,6 @@ import (
 // Explorer renders explorer pages for one database.
 type Explorer struct {
 	DB *sql.DB
-	// Postgres selects the real PostgreSQL system catalogs; false uses the
-	// SQLite-style catalog (sqlite_master/PRAGMA) of engines like pglike.
-	Postgres bool
 	// BasePath prefixes every link the explorer emits, e.g.
 	// "/internal/explorer". Empty means links from the root ("/books").
 	BasePath string
@@ -128,9 +125,8 @@ func (e *Explorer) Handler() http.Handler {
 	})
 }
 
-// The explorer reads catalog metadata through the helpers below, which
-// branch on the backend: pglike exposes SQLite-style sqlite_master/PRAGMA,
-// real PostgreSQL uses information_schema/pg_catalog.
+// The explorer reads catalog metadata through the helpers below, using the
+// PostgreSQL catalogs for the public schema.
 
 // dbColInfo describes one column of a table.
 type dbColInfo struct {
@@ -160,11 +156,7 @@ func (e *Explorer) Tables() []string {
 	if e.DB == nil {
 		return nil
 	}
-	q := `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
-	if e.Postgres {
-		q = `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
-	}
-	rows, err := e.DB.Query(q)
+	rows, err := e.DB.Query(`SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`)
 	if err != nil {
 		return nil
 	}
@@ -184,11 +176,7 @@ func (e *Explorer) Views() []string {
 	if e.DB == nil {
 		return nil
 	}
-	q := `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`
-	if e.Postgres {
-		q = `SELECT viewname FROM pg_views WHERE schemaname = 'public' ORDER BY viewname`
-	}
-	rows, err := e.DB.Query(q)
+	rows, err := e.DB.Query(`SELECT viewname FROM pg_views WHERE schemaname = 'public' ORDER BY viewname`)
 	if err != nil {
 		return nil
 	}
@@ -221,46 +209,25 @@ func (e *Explorer) tableColumns(name string) []dbColInfo {
 		return nil
 	}
 	var cols []dbColInfo
-	if e.Postgres {
-		rows, err := e.DB.Query(`SELECT c.ordinal_position, c.column_name, c.data_type,
-				c.is_nullable = 'NO', COALESCE(c.column_default, ''), COALESCE(pk.is_pk, false)
-			FROM information_schema.columns c
-			LEFT JOIN (SELECT kcu.column_name, true AS is_pk
-				FROM information_schema.table_constraints tc
-				JOIN information_schema.key_column_usage kcu
-					ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-				WHERE tc.constraint_type = 'PRIMARY KEY'
-					AND tc.table_schema = 'public' AND tc.table_name = $1
-			) pk ON pk.column_name = c.column_name
-			WHERE c.table_schema = 'public' AND c.table_name = $1
-			ORDER BY c.ordinal_position`, name)
-		if err != nil {
-			return nil
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var c dbColInfo
-			if rows.Scan(&c.pos, &c.name, &c.ctype, &c.notNull, &c.dflt, &c.pk) == nil {
-				cols = append(cols, c)
-			}
-		}
-		return cols
-	}
-	rows, err := e.DB.Query(fmt.Sprintf(`PRAGMA table_info("%s")`, name))
+	rows, err := e.DB.Query(`SELECT c.ordinal_position, c.column_name, c.data_type,
+			c.is_nullable = 'NO', COALESCE(c.column_default, ''), COALESCE(pk.is_pk, false)
+		FROM information_schema.columns c
+		LEFT JOIN (SELECT kcu.column_name, true AS is_pk
+			FROM information_schema.table_constraints tc
+			JOIN information_schema.key_column_usage kcu
+				ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
+			WHERE tc.constraint_type = 'PRIMARY KEY'
+				AND tc.table_schema = 'public' AND tc.table_name = $1
+		) pk ON pk.column_name = c.column_name
+		WHERE c.table_schema = 'public' AND c.table_name = $1
+		ORDER BY c.ordinal_position`, name)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var c dbColInfo
-		var notnull, pk int
-		var dflt *string
-		if rows.Scan(&c.pos, &c.name, &c.ctype, &notnull, &dflt, &pk) == nil {
-			c.notNull = notnull == 1
-			c.pk = pk > 0
-			if dflt != nil {
-				c.dflt = *dflt
-			}
+		if rows.Scan(&c.pos, &c.name, &c.ctype, &c.notNull, &c.dflt, &c.pk) == nil {
 			cols = append(cols, c)
 		}
 	}
@@ -273,40 +240,24 @@ func (e *Explorer) tableFKs(name string) []dbFKInfo {
 		return nil
 	}
 	var fks []dbFKInfo
-	if e.Postgres {
-		rows, err := e.DB.Query(`SELECT kcu.column_name, ccu.table_name, ccu.column_name,
-				rc.update_rule, rc.delete_rule
-			FROM information_schema.table_constraints tc
-			JOIN information_schema.key_column_usage kcu
-				ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-			JOIN information_schema.constraint_column_usage ccu
-				ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-			JOIN information_schema.referential_constraints rc
-				ON rc.constraint_name = tc.constraint_name AND rc.constraint_schema = tc.table_schema
-			WHERE tc.constraint_type = 'FOREIGN KEY'
-				AND tc.table_schema = 'public' AND tc.table_name = $1`, name)
-		if err != nil {
-			return nil
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var f dbFKInfo
-			if rows.Scan(&f.fromCol, &f.refTable, &f.toCol, &f.onUpdate, &f.onDelete) == nil {
-				fks = append(fks, f)
-			}
-		}
-		return fks
-	}
-	rows, err := e.DB.Query(fmt.Sprintf(`PRAGMA foreign_key_list("%s")`, name))
+	rows, err := e.DB.Query(`SELECT kcu.column_name, ccu.table_name, ccu.column_name,
+			rc.update_rule, rc.delete_rule
+		FROM information_schema.table_constraints tc
+		JOIN information_schema.key_column_usage kcu
+			ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
+		JOIN information_schema.constraint_column_usage ccu
+			ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+		JOIN information_schema.referential_constraints rc
+			ON rc.constraint_name = tc.constraint_name AND rc.constraint_schema = tc.table_schema
+		WHERE tc.constraint_type = 'FOREIGN KEY'
+			AND tc.table_schema = 'public' AND tc.table_name = $1`, name)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, seq int
 		var f dbFKInfo
-		var match string
-		if rows.Scan(&id, &seq, &f.refTable, &f.fromCol, &f.toCol, &f.onUpdate, &f.onDelete, &match) == nil {
+		if rows.Scan(&f.fromCol, &f.refTable, &f.toCol, &f.onUpdate, &f.onDelete) == nil {
 			fks = append(fks, f)
 		}
 	}
@@ -319,56 +270,25 @@ func (e *Explorer) tableIndexes(name string) []dbIdxInfo {
 		return nil
 	}
 	var idxs []dbIdxInfo
-	if e.Postgres {
-		rows, err := e.DB.Query(`SELECT indexname, indexdef FROM pg_indexes
-			WHERE schemaname = 'public' AND tablename = $1 ORDER BY indexname`, name)
-		if err != nil {
-			return nil
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var ix dbIdxInfo
-			var def string
-			if rows.Scan(&ix.name, &def) != nil {
-				continue
-			}
-			ix.unique = strings.HasPrefix(def, "CREATE UNIQUE")
-			if lp, rp := strings.Index(def, "("), strings.LastIndex(def, ")"); lp >= 0 && rp > lp {
-				ix.columns = def[lp+1 : rp]
-			}
-			if strings.HasSuffix(ix.name, "_pkey") {
-				ix.origin = "pk"
-			}
-			idxs = append(idxs, ix)
-		}
-		return idxs
-	}
-	rows, err := e.DB.Query(fmt.Sprintf(`PRAGMA index_list("%s")`, name))
+	rows, err := e.DB.Query(`SELECT indexname, indexdef FROM pg_indexes
+		WHERE schemaname = 'public' AND tablename = $1 ORDER BY indexname`, name)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var seq int
-		var unique, partial int
 		var ix dbIdxInfo
-		if rows.Scan(&seq, &ix.name, &unique, &ix.origin, &partial) != nil {
+		var def string
+		if rows.Scan(&ix.name, &def) != nil {
 			continue
 		}
-		ix.unique = unique == 1
-		var cols []string
-		ixColRows, err := e.DB.Query(fmt.Sprintf(`PRAGMA index_info("%s")`, ix.name))
-		if err == nil {
-			for ixColRows.Next() {
-				var seqno, cid int
-				var colName string
-				if ixColRows.Scan(&seqno, &cid, &colName) == nil {
-					cols = append(cols, colName)
-				}
-			}
-			ixColRows.Close()
+		ix.unique = strings.HasPrefix(def, "CREATE UNIQUE")
+		if lp, rp := strings.Index(def, "("), strings.LastIndex(def, ")"); lp >= 0 && rp > lp {
+			ix.columns = def[lp+1 : rp]
 		}
-		ix.columns = strings.Join(cols, ", ")
+		if strings.HasSuffix(ix.name, "_pkey") {
+			ix.origin = "pk"
+		}
 		idxs = append(idxs, ix)
 	}
 	return idxs

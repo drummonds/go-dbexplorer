@@ -63,7 +63,7 @@ func backends(t *testing.T) map[string]*dbexplorer.Explorer {
 			pg.Exec(`DROP TABLE IF EXISTS ` + tbl + ` CASCADE`)
 		}
 		seedTestDB(t, pg)
-		m["postgres"] = &dbexplorer.Explorer{DB: pg, Postgres: true}
+		m["postgres"] = &dbexplorer.Explorer{DB: pg}
 	}
 	return m
 }
@@ -284,6 +284,33 @@ func TestViewsListedAndAnnotated(t *testing.T) {
 				if !strings.Contains(page, want) {
 					t.Errorf("view page missing %q", want)
 				}
+			}
+		})
+	}
+}
+
+// Both backends go through the PostgreSQL catalogs, so the schema section
+// reads the same: PG type names, the PK index as <table>_pkey, and view
+// columns.
+func TestSchemaSameOnBothBackends(t *testing.T) {
+	for backend, e := range backends(t) {
+		t.Run(backend, func(t *testing.T) {
+			page := e.TableHTML("loans", 1, "", "", false)
+			for _, want := range []string{
+				"<td>loans_pkey</td><td>id</td><td>YES</td><td>pk</td>",
+				"<td><strong>id</strong></td><td>uuid</td>",
+				"<td><strong>borrowed</strong></td><td>timestamp without time zone</td>",
+			} {
+				if !strings.Contains(page, want) {
+					t.Errorf("loans page missing %q", want)
+				}
+			}
+			if _, err := e.DB.Exec(`CREATE VIEW book_titles AS SELECT id, title FROM books`); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { e.DB.Exec(`DROP VIEW book_titles`) })
+			if page := e.TableHTML("book_titles", 1, "", "", false); !strings.Contains(page, "Schema (2 columns)") {
+				t.Error("view page should list its 2 columns")
 			}
 		})
 	}

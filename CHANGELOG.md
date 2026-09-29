@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+- `Explorer.Postgres`. Both backends now use the PostgreSQL catalogs
+  (`pg_tables`, `pg_views`, `information_schema`, `pg_indexes`), which pglike
+  provides from go-postgres v0.6.0. On pglike, the schema section now shows PG
+  type names, the `<table>_pkey` index and view columns, the same as real
+  PostgreSQL. Delete the field from `Explorer` literals.
+
 ## [0.1.2] - 2026-09-27
 
 ### Added

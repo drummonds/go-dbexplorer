@@ -55,7 +55,6 @@ func main() {
 	ver := buildVersion()
 	ex := &dbexplorer.Explorer{
 		DB:         db,
-		Postgres:   *dsn != "",
 		UUIDLen:    *uuidLen,
 		TimeFormat: *timeFormat,
 		Title:      "go-dbexplorer demo " + ver + " — " + backend,
