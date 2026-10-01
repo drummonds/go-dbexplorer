@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- Skins. Pages render through `html/template`s over exported view models
+  (`IndexView`, `TableView`, `PageView` and their parts). `ParseSkin(fsys)`
+  layers a host's `*.tmpl` files over the built-in Bulma skin, so a host
+  overrides only the templates it needs; set it as `Explorer.Skin`.
+- The demo explores the same database through two skins: Bulma at `/` and a
+  plain, classless skin at `/plain` that shows data rows as records. The
+  WASM demo switches skin and stylesheet by URL.
+
+### Changed
+- `&` in emitted link URLs is now written `&amp;` (correct HTML; browsers and
+  `getAttribute` decode it). Tests matching raw `href` strings need updating.
+
 ## [0.2.1] - 2026-09-29
 
  - Version update

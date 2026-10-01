@@ -2,7 +2,8 @@
 
 // WASM build of the demo: pglike (SQLite compiled to WASM) runs the sample
 // library database entirely in the browser. The page's JS intercepts link
-// clicks and calls goRender(url) for each navigation; goVersion() reports
+// clicks and calls goRender(url) for each navigation (URLs under /plain
+// render in the plain skin); goVersion() reports
 // the build version.
 package main
 
@@ -11,7 +12,6 @@ import (
 	"log"
 	"syscall/js"
 
-	dbexplorer "git.bytestone.uk/hum3/go-dbexplorer"
 	_ "git.bytestone.uk/hum3/go-postgres"
 )
 
@@ -22,14 +22,14 @@ func main() {
 	}
 	seedSampleDB(db)
 
-	ex := &dbexplorer.Explorer{DB: db, UUIDLen: 8, TimeFormat: "2006-01-02 15:04"}
+	d := newDemo(db, 8, "2006-01-02 15:04")
 
 	js.Global().Set("goRender", js.FuncOf(func(this js.Value, args []js.Value) any {
 		url := "/"
 		if len(args) > 0 {
 			url = args[0].String()
 		}
-		return ex.Render(url)
+		return d.Render(url)
 	}))
 
 	js.Global().Set("goVersion", js.FuncOf(func(this js.Value, args []js.Value) any {

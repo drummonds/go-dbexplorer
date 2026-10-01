@@ -1,0 +1,11 @@
+{{- /* Built-in Bulma skin: the standalone page Handler serves. Data: PageView. */ -}}
+{{define "page" -}}
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+</head><body><section class="section"><div class="container">
+{{- .Content}}
+{{- with .Footer}}<footer class="mt-5 is-size-7 has-text-grey">{{.}}</footer>{{end -}}
+</div></section></body></html>
+{{- end}}

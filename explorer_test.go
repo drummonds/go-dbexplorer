@@ -210,11 +210,11 @@ func TestForeignKeyLinksAndFilter(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
 			out := e.TableHTML("books", 1, "", "", false)
-			if !strings.Contains(out, `<td><a href="/authors?filter=id&value=1">1</a></td>`) {
+			if !strings.Contains(out, `<td><a href="/authors?filter=id&amp;value=1">1</a></td>`) {
 				t.Errorf("FK cell should link to the referenced table filtered on the key:\n%s", out)
 			}
-			if strings.Contains(out, `<td><a href="/authors?filter=id&value=`) &&
-				strings.Count(out, `href="/authors?filter=id&value=1"`) != 2 {
+			if strings.Contains(out, `<td><a href="/authors?filter=id&amp;value=`) &&
+				strings.Count(out, `href="/authors?filter=id&amp;value=1"`) != 2 {
 				t.Error("both Le Guin books should link to author 1")
 			}
 
@@ -227,10 +227,10 @@ func TestForeignKeyLinksAndFilter(t *testing.T) {
 				t.Error("filtered page should show the filter and a clear link")
 			}
 			// Sort and toggle links keep the filter.
-			if !strings.Contains(filtered, `href="/books?dir=asc&filter=author_id&sort=title&value=2">title</a>`) {
+			if !strings.Contains(filtered, `href="/books?dir=asc&amp;filter=author_id&amp;sort=title&amp;value=2">title</a>`) {
 				t.Errorf("sort links should carry the filter:\n%s", filtered)
 			}
-			if !strings.Contains(filtered, `href="/books?filter=author_id&trunc=1&value=2"`) {
+			if !strings.Contains(filtered, `href="/books?filter=author_id&amp;trunc=1&amp;value=2"`) {
 				t.Error("truncate toggle should carry the filter")
 			}
 

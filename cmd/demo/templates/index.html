@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>go-dbexplorer WASM demo</title>
   <link rel="icon" href="favicon.svg">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+  <link id="skin-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
 </head>
 <body>
   <section class="section">
@@ -15,16 +15,33 @@
         browser, seeded with a sample lending library.
         <a href="https://git.bytestone.uk/hum3/go-dbexplorer">Source</a>
         &middot; <span id="version">loading&hellip;</span></p>
+      <p id="skins">Skin: <a href="/">Bulma</a> &middot; <a href="/plain">Plain</a></p>
       <div id="content"><progress class="progress is-small is-primary" max="100">Loading WASM…</progress></div>
     </div>
   </section>
   <script src="wasm_exec.js"></script>
   <script>
     const content = document.getElementById("content");
+    // The demo's two explorers: URLs under /plain use the plain skin, which
+    // is styled by simple.css instead of Bulma.
+    const skinCSS = {
+      bulma: "https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css",
+      plain: "https://cdn.jsdelivr.net/npm/simpledotcss@2.3.3/simple.min.css",
+    };
     function nav(url) {
+      const plain = url === "/plain" || url.startsWith("/plain/") || url.startsWith("/plain?");
+      const css = document.getElementById("skin-css");
+      const want = plain ? skinCSS.plain : skinCSS.bulma;
+      if (css.href !== want) css.href = want;
       content.innerHTML = goRender(url);
       window.scrollTo(0, 0);
     }
+    document.getElementById("skins").addEventListener("click", (e) => {
+      const a = e.target.closest("a");
+      if (!a) return;
+      e.preventDefault();
+      nav(a.getAttribute("href"));
+    });
     content.addEventListener("click", (e) => {
       const a = e.target.closest("a");
       if (!a || !content.contains(a)) return;

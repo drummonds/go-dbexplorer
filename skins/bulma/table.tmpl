@@ -1,0 +1,64 @@
+{{- /* Built-in Bulma skin: one table's page. Data: TableView. */ -}}
+{{define "table" -}}
+{{- if .NotFound -}}
+<h2 class="title is-4">Table Not Found</h2><p class="has-text-danger">Unknown table: {{.Name}}</p><p><a href="{{.IndexURL}}">&larr; Back to explorer</a></p>
+{{- else if and .Error (not .Columns) -}}
+<p class="has-text-danger">{{.Error}}</p>
+{{- else -}}
+<h2 class="title is-4">Table: {{.Name}}</h2><p class="mb-4"><a href="{{.IndexURL}}">&larr; Back to explorer</a></p>
+{{- /* Schema is a closed master <details>; FKs and indexes nest inside it.
+     Native <details> keeps this JS-free in Handler pages and WASM hosts. */ -}}
+<details class="box"><summary class="title is-5" style="cursor:pointer">Schema ({{len .Columns}} columns)</summary>
+{{- if .Columns -}}
+<table class="table is-fullwidth is-striped is-narrow"><thead><tr><th>#</th><th>Name</th><th>Type</th><th>Not Null</th><th>Default</th><th>PK</th></tr></thead><tbody>
+{{- range .Columns}}<tr><td>{{.Position}}</td><td><strong>{{.Name}}</strong></td><td>{{.Type}}</td><td>{{if .NotNull}}YES{{end}}</td><td>{{.Default}}</td><td>{{if .PrimaryKey}}YES{{end}}</td></tr>{{end -}}
+</tbody></table>
+{{- else}}<p class="has-text-danger">Schema not available.</p>{{end}}
+{{- with .ForeignKeys -}}
+<details class="mt-4"><summary class="title is-6" style="cursor:pointer">Foreign Keys ({{len .}})</summary><table class="table is-fullwidth is-striped is-narrow"><thead><tr><th>Column</th><th>References</th><th>Column</th><th>On Update</th><th>On Delete</th></tr></thead><tbody>
+{{- range .}}<tr><td>{{.Column}}</td><td><a href="{{.References.URL}}">{{.References.Text}}</a></td><td>{{.ReferencedColumn}}</td><td>{{.OnUpdate}}</td><td>{{.OnDelete}}</td></tr>{{end -}}
+</tbody></table></details>
+{{- end}}
+{{- with .Indexes -}}
+<details class="mt-4"><summary class="title is-6" style="cursor:pointer">Indexes ({{len .}})</summary><table class="table is-fullwidth is-striped is-narrow"><thead><tr><th>Name</th><th>Columns</th><th>Unique</th><th>Origin</th></tr></thead><tbody>
+{{- range .}}<tr><td>{{.Name}}</td><td>{{.Columns}}</td><td>{{if .Unique}}YES{{end}}</td><td>{{.Origin}}</td></tr>{{end -}}
+</tbody></table></details>
+{{- end -}}
+</details>
+<div class="box"><h3 class="title is-5">Data ({{.TotalRows}} rows)</h3>
+{{- with .Filter}}<p class="mb-3"><span class="tag is-info is-light">Filter: {{.Column}} = {{.Value}}</span> <a class="is-size-7" href="{{.ClearURL}}">clear filter</a></p>{{end -}}
+<p class="mb-3"><a class="button is-small" href="{{.TruncToggle}}">{{if .Trunc}}Show full values{{else}}Truncate text to 10 chars{{end}}</a></p>
+{{- if .Error}}<p class="has-text-danger">{{.Error}}</p>
+{{- else -}}
+{{- with .Headers -}}
+<div style="overflow-x:auto"><table class="table is-fullwidth is-striped is-narrow"><thead><tr>
+{{- range .}}<th><a href="{{.URL}}">{{.Name}}{{if eq .Sorted "asc"}} &uarr;{{else if eq .Sorted "desc"}} &darr;{{end}}</a></th>{{end -}}
+</tr></thead><tbody>
+{{- range $.Rows}}<tr>{{range .}}{{template "cell" .}}{{end}}</tr>{{end -}}
+</tbody></table></div>
+{{- if not $.Rows}}<p class="has-text-grey">No rows.</p>{{end}}
+{{- end}}
+{{- with .Pager -}}
+<nav class="pagination is-small mt-4" role="navigation">
+{{- if .PrevURL}}<a class="pagination-previous" href="{{.PrevURL}}">Previous</a>{{else}}<a class="pagination-previous" disabled>Previous</a>{{end}}
+{{- if .NextURL}}<a class="pagination-next" href="{{.NextURL}}">Next</a>{{else}}<a class="pagination-next" disabled>Next</a>{{end -}}
+<ul class="pagination-list">
+{{- range .Links}}
+{{- if .Gap}}<li><span class="pagination-ellipsis">&hellip;</span></li>{{end}}
+{{- if .Current}}<li><a class="pagination-link is-current">{{.Number}}</a></li>{{else}}<li><a class="pagination-link" href="{{.URL}}">{{.Number}}</a></li>{{end}}
+{{- end -}}
+</ul></nav>
+{{- end}}
+{{- end -}}
+</div>
+{{- end}}
+{{- end}}
+
+{{- /* One data cell. Data: Cell. */ -}}
+{{define "cell" -}}
+{{- if .Null}}<td class="has-text-grey-light">NULL</td>
+{{- else}}<td{{with .Full}} title="{{.}}"{{end}}>{{if .URL}}<a href="{{.URL}}">{{template "cell-text" .}}</a>{{else}}{{template "cell-text" .}}{{end}}</td>
+{{- end}}
+{{- end}}
+
+{{define "cell-text"}}{{.Text}}{{if .Full}}&hellip;{{end}}{{end}}

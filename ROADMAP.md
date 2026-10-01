@@ -11,7 +11,7 @@ scoped to one component or all, behind the host's access control, and
 skinnable. The explorer imports neither gobank-db nor an RBAC library; it
 defines small interfaces and the host supplies them.
 
-- [ ] Skins: render from view models through embedded `html/template`s a host
+- [x] (unreleased) Skins: render from view models through embedded `html/template`s a host
       can override (an `fs.FS`); behaviour-preserving. The sample app ships
       two skins — Bulma (default) and a deliberately different second one.
       Trade-off accepted: the view models become public API.

@@ -63,7 +63,7 @@ async function main() {
 	// demo's format, and NULLs render as NULL.
 	const m = books.match(/<td title="([0-9a-f-]{36})">([0-9a-f]{8})&hellip;<\/td>/);
 	assert(m !== null, 'books page shows shortened UUIDs with full value in title');
-	const fk = books.match(/<td title="([0-9a-f-]{36})"><a href="\/authors\?filter=id&value=\1">[0-9a-f]{8}&hellip;<\/a><\/td>/);
+	const fk = books.match(/<td title="([0-9a-f-]{36})"><a href="\/authors\?filter=id&amp;value=\1">[0-9a-f]{8}&hellip;<\/a><\/td>/);
 	assert(fk !== null, 'author_id cells link to /authors?filter=id&value=<uuid>');
 	if (fk) {
 		const author = goRender('/authors?filter=id&value=' + fk[1]);
@@ -79,6 +79,12 @@ async function main() {
 	const loans = goRender('/loans?page=2');
 	assert(loans.includes('Table: loans'), 'loans page 2 renders');
 	assert(loans.includes('pagination'), 'loans paginates (120 rows)');
+
+	// The plain skin: same data, restructured markup, links kept under /plain.
+	const plainBooks = goRender('/plain/books?sort=title&dir=asc');
+	assert(plainBooks.includes('<article') && !plainBooks.includes('class="table'), 'plain skin renders rows as records');
+	assert(plainBooks.includes('Ancillary Justice'), 'plain skin shows the same data');
+	assert(plainBooks.includes('href="/plain/authors?filter=id&amp;value='), 'plain skin links stay in the plain explorer');
 
 	const missing = goRender('/no_such_table');
 	assert(missing.includes('Table Not Found'), 'unknown table handled');

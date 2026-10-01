@@ -5,7 +5,8 @@
 // data the WASM demo shows in the browser. Point it at real PostgreSQL with
 // -dsn or DBEXPLORER_PG_DSN to explore that instead (the sample data is
 // seeded there too if the tables are absent). -uuid-len and -time-format
-// set the explorer's column formatting.
+// set the explorer's column formatting. The same database is explored
+// through the built-in Bulma skin at / and the demo's plain skin at /plain.
 package main
 
 import (
@@ -17,7 +18,6 @@ import (
 	"net/http"
 	"os"
 
-	dbexplorer "git.bytestone.uk/hum3/go-dbexplorer"
 	_ "git.bytestone.uk/hum3/go-postgres"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -53,15 +53,16 @@ func main() {
 	}
 
 	ver := buildVersion()
-	ex := &dbexplorer.Explorer{
-		DB:         db,
-		UUIDLen:    *uuidLen,
-		TimeFormat: *timeFormat,
-		Title:      "go-dbexplorer demo " + ver + " — " + backend,
-		Footer: fmt.Sprintf(`go-dbexplorer demo %s &middot; %s &middot; <a href="https://git.bytestone.uk/hum3/go-dbexplorer">Source</a>`,
-			html.EscapeString(ver), html.EscapeString(backend)),
+	d := newDemo(db, *uuidLen, *timeFormat)
+	footer := func(other, href string) string {
+		return fmt.Sprintf(`go-dbexplorer demo %s &middot; %s &middot; <a href="%s">%s skin</a> &middot; <a href="https://git.bytestone.uk/hum3/go-dbexplorer">Source</a>`,
+			html.EscapeString(ver), html.EscapeString(backend), href, other)
 	}
-	http.Handle("/", ex.Handler())
+	d.bulma.Title, d.bulma.Footer = "go-dbexplorer demo "+ver+" — "+backend, footer("Plain", plainBase)
+	d.plain.Title, d.plain.Footer = d.bulma.Title, footer("Bulma", "/")
+	http.Handle("/", d.bulma.Handler())
+	http.Handle(plainBase, d.plain.Handler())
+	http.Handle(plainBase+"/", d.plain.Handler())
 
 	log.Printf("go-dbexplorer demo %s (%s) on http://localhost%s/", ver, backend, *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))

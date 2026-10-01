@@ -1,0 +1,11 @@
+{{- /* Plain skin: the standalone page, styled by simple.css. Data: PageView. */ -}}
+{{define "page" -}}
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simpledotcss@2.3.3/simple.min.css">
+</head><body><header><h1>{{.Title}}</h1><nav><a href="/">Bulma skin</a> <a href="/plain">Plain skin</a></nav></header>
+<main>{{.Content}}</main>
+{{- with .Footer}}<footer>{{.}}</footer>{{end -}}
+</body></html>
+{{- end}}

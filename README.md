@@ -17,8 +17,10 @@ deployments:
   catalog views on every connection
 - **WASM**, the same pglike database running entirely in the browser
 
-The emitted HTML uses [Bulma](https://bulma.io/) class names; pages render
-unstyled without it. Every identifier and value is HTML-escaped.
+Pages render through a skin of `html/template`s. The built-in skin emits
+[Bulma](https://bulma.io/) class names and renders unstyled without it; a
+host can replace any of its templates (see [Skins](#skins)). Every
+identifier and value is HTML-escaped.
 
 ## Library
 
@@ -70,11 +72,36 @@ string carries `page`, `sort`, `dir`, `trunc`, and `filter`/`value`.
 - **Truncate toggle.** The per-page `trunc=1` option additionally cuts any
   text cell to 10 characters.
 
+### Skins
+
+A skin is three templates over exported view models: `index`
+(`IndexView`), `table` (`TableView`) and `page` (`PageView`, the document
+`Handler` wraps around a page). The view models carry display-ready data —
+formatted cell text, every link already built — so a template only arranges
+it. `ParseSkin` layers a host's `*.tmpl` files over the built-in Bulma skin,
+so a host overrides just the templates it needs, and reports template
+errors at startup:
+
+```go
+//go:embed skins/mine/*.tmpl
+var mine embed.FS
+
+sub, _ := fs.Sub(mine, "skins/mine")
+skin, err := dbexplorer.ParseSkin(sub) // defines "index", "table" and/or "page"
+ex.Skin = skin                         // nil = built-in Bulma
+```
+
+Templates may restructure the page, not just restyle it: the demo's
+[plain skin](cmd/demo/skins/plain) renders classless HTML for simple.css
+and shows each data row as a record rather than a table row. `Annotate` and
+`Footer` are the only trusted HTML; everything else is escaped.
+
 ## Demo
 
 The demo explores a sample lending-library database (authors, books,
 members, loans — UUID keys, foreign keys and indexes included), on any of
-the backends:
+the backends, through two skins: the built-in Bulma one at `/` and the
+demo's plain skin at `/plain`:
 
 ```sh
 task demo                                   # pglike, in-memory: http://localhost:8080/
