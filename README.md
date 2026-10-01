@@ -34,11 +34,11 @@ ex := &dbexplorer.Explorer{
     TimeFormat: "2006-01-02 15:04",   // Go layout for time.Time cells
 }
 
-html := ex.IndexHTML()                                  // overview fragment
-html  = ex.TableHTML("books", 1, "title", "asc", false) // table fragment
-html  = ex.TableHTMLWith("books", dbexplorer.TableOptions{
+html := ex.IndexHTML(ctx)                                  // overview fragment
+html  = ex.TableHTML(ctx, "books", 1, "title", "asc", false) // table fragment
+html  = ex.TableHTMLWith(ctx, "books", dbexplorer.TableOptions{
     Sort: "title", Dir: "asc", FilterCol: "author_id", FilterVal: id})
-html  = ex.Render("/internal/explorer/books?page=2")    // path-routed
+html  = ex.Render(ctx, "/internal/explorer/books?page=2")    // path-routed
 http.Handle("/", ex.Handler())                          // standalone pages
 ```
 
@@ -93,6 +93,25 @@ component's scope. The unscoped index lists the components and tags each
 table with its owner. `Catalog` is an interface, so the components can
 come from code or from the database itself. Without a catalog, `/c/…` has
 no special meaning.
+
+### Access
+
+An `Authoriser` decides which components the viewer may see. The explorer
+doesn't know who the viewer is: the host puts that in the `ctx` it passes
+to `Render` (`Handler` passes the request's context) and the Authoriser
+reads it back:
+
+```go
+ex.Authoriser = dbexplorer.AuthoriserFunc(func(ctx context.Context, component string) bool {
+    return roleFrom(ctx).CanView(component)
+})
+```
+
+A component the viewer may not see drops out of the index and its pages
+say access is denied; a foreign key into it shows the value and its owner
+but no link. Tables no component owns — all of them, without a `Catalog` —
+are asked about as component `""`. With no Authoriser everything is
+visible.
 
 ### Skins
 

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- Access control. `Explorer.Authoriser` (an `Authoriser` interface;
+  `AuthoriserFunc` adapts a function) decides per component what the
+  viewer, identified from the context, may see. Denied components drop out
+  of the index, their pages say access is denied, and foreign keys into
+  them show the value and owner without a link. Unowned tables are asked
+  about as component `""`. View models gain `Denied` and `NoAccess`.
+
+### Changed
+- **Breaking:** `Render`, `IndexHTML`, `TableHTML` and `TableHTMLWith` take
+  a `context.Context` first, carrying the viewer to the Authoriser.
+  `Handler` passes the request's context.
+
 ## [0.3.0] - 2026-10-01
 
  - Skins and components: templates over view models, per-component scopes

@@ -20,7 +20,7 @@ defines small interfaces and the host supplies them.
       own tables plus the contract views it publishes; a cross-component FK
       links into the target component's scope if authorised, otherwise plain
       text with the owner badge. Sample app gains components.
-- [ ] Access: an `Authoriser` interface (may this viewer see this component;
+- [x] (unreleased) Access: an `Authoriser` interface (may this viewer see this component;
       shaped to allow column-level masking later, component-level only now).
       Rendering takes a `ctx` — breaking, minor bump.
 - [ ] Standalone CLI reads the component catalog from the database once

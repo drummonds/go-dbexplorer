@@ -23,14 +23,14 @@ func TestSkinOverridesTemplates(t *testing.T) {
 		t.Run(backend, func(t *testing.T) {
 			e.Skin = skin
 			defer func() { e.Skin = nil }()
-			index := e.IndexHTML()
+			index := e.IndexHTML(t.Context())
 			if !strings.Contains(index, `<li class="custom"><a href="/books">books</a> 3</li>`) {
 				t.Errorf("index not rendered by the skin: %.300s", index)
 			}
 			if strings.Contains(index, `class="box"`) {
 				t.Error("index still carries the Bulma markup")
 			}
-			if table := e.TableHTML("books", 1, "", "", false); !strings.Contains(table, `<details class="box">`) {
+			if table := e.TableHTML(t.Context(), "books", 1, "", "", false); !strings.Contains(table, `<details class="box">`) {
 				t.Error("table page should fall back to the built-in template")
 			}
 		})
@@ -83,7 +83,7 @@ func TestSkinEscapesData(t *testing.T) {
 				return "", false
 			}
 			defer func() { e.Format = nil }()
-			page := e.TableHTML("books", 1, "", "", false)
+			page := e.TableHTML(t.Context(), "books", 1, "", "", false)
 			if strings.Contains(page, "<script>x</script>") || !strings.Contains(page, "&lt;script&gt;x&lt;/script&gt;") {
 				t.Error("formatted cell text not escaped")
 			}

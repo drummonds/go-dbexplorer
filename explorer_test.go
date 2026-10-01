@@ -71,7 +71,7 @@ func backends(t *testing.T) map[string]*dbexplorer.Explorer {
 func TestIndexHTML(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
-			html := e.IndexHTML()
+			html := e.IndexHTML(t.Context())
 			for _, want := range []string{"authors", "books", "Relationships", "author_id"} {
 				if !strings.Contains(html, want) {
 					t.Errorf("index missing %q", want)
@@ -84,7 +84,7 @@ func TestIndexHTML(t *testing.T) {
 func TestTableHTML(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
-			html := e.TableHTML("books", 1, "title", "asc", false)
+			html := e.TableHTML(t.Context(), "books", 1, "title", "asc", false)
 			for _, want := range []string{"Table: books", "Schema", "Foreign Keys", "Indexes",
 				"The Dispossessed", "idx_books_author", "authors"} {
 				if !strings.Contains(html, want) {
@@ -109,11 +109,11 @@ func TestTableHTML(t *testing.T) {
 				strings.Count(html[masterAt:dataAt], "</details>") != 3 {
 				t.Error("expected schema master plus two nested detail sections")
 			}
-			if !strings.Contains(e.TableHTML("nope", 1, "", "", false), "Table Not Found") {
+			if !strings.Contains(e.TableHTML(t.Context(), "nope", 1, "", "", false), "Table Not Found") {
 				t.Error("unknown table should render Table Not Found")
 			}
 			// Injection attempt via sort must be rejected by column validation.
-			if got := e.TableHTML("books", 1, `title";DROP TABLE books;--`, "asc", false); strings.Contains(got, "Query error") {
+			if got := e.TableHTML(t.Context(), "books", 1, `title";DROP TABLE books;--`, "asc", false); strings.Contains(got, "Query error") {
 				t.Error("invalid sort column should fall back, not error")
 			}
 		})
@@ -123,15 +123,15 @@ func TestTableHTML(t *testing.T) {
 func TestRenderRouting(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
-			if !strings.Contains(e.Render("/"), "DB Explorer") {
+			if !strings.Contains(e.Render(t.Context(), "/"), "DB Explorer") {
 				t.Error("Render(/) should be the index")
 			}
-			if !strings.Contains(e.Render("/books?page=1&sort=title&dir=asc"), "Table: books") {
+			if !strings.Contains(e.Render(t.Context(), "/books?page=1&sort=title&dir=asc"), "Table: books") {
 				t.Error("Render(/books) should be the table page")
 			}
 			e.BasePath = "/internal/explorer"
 			defer func() { e.BasePath = "" }()
-			out := e.Render("/internal/explorer/books")
+			out := e.Render(t.Context(), "/internal/explorer/books")
 			if !strings.Contains(out, "Table: books") {
 				t.Error("Render should strip BasePath")
 			}
@@ -167,7 +167,7 @@ func TestCellFormatting(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
 			// Defaults: full UUID, Go's default time text, NULL in grey.
-			out := e.TableHTML("loans", 1, "", "", false)
+			out := e.TableHTML(t.Context(), "loans", 1, "", "", false)
 			if !strings.Contains(out, "<td>"+testUUID+"</td>") {
 				t.Error("UUID should be shown in full when UUIDLen is 0")
 			}
@@ -180,7 +180,7 @@ func TestCellFormatting(t *testing.T) {
 
 			e.UUIDLen = 8
 			e.TimeFormat = "02 Jan 2006 15:04"
-			out = e.TableHTML("loans", 1, "", "", false)
+			out = e.TableHTML(t.Context(), "loans", 1, "", "", false)
 			if !strings.Contains(out, fmt.Sprintf(`<td title="%s">%s&hellip;</td>`, testUUID, testUUID[:8])) {
 				t.Errorf("UUID should be shortened to 8 chars with full value in title:\n%s", out)
 			}
@@ -194,7 +194,7 @@ func TestCellFormatting(t *testing.T) {
 				}
 				return "", false
 			}
-			out = e.TableHTML("loans", 1, "", "", false)
+			out = e.TableHTML(t.Context(), "loans", 1, "", "", false)
 			if !strings.Contains(out, "<td>custom</td>") || strings.Contains(out, "05 Jan 2026") {
 				t.Error("Format hook should take precedence for its column")
 			}
@@ -209,7 +209,7 @@ func TestCellFormatting(t *testing.T) {
 func TestForeignKeyLinksAndFilter(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
-			out := e.TableHTML("books", 1, "", "", false)
+			out := e.TableHTML(t.Context(), "books", 1, "", "", false)
 			if !strings.Contains(out, `<td><a href="/authors?filter=id&amp;value=1">1</a></td>`) {
 				t.Errorf("FK cell should link to the referenced table filtered on the key:\n%s", out)
 			}
@@ -218,7 +218,7 @@ func TestForeignKeyLinksAndFilter(t *testing.T) {
 				t.Error("both Le Guin books should link to author 1")
 			}
 
-			filtered := e.TableHTMLWith("books", dbexplorer.TableOptions{FilterCol: "author_id", FilterVal: "2"})
+			filtered := e.TableHTMLWith(t.Context(), "books", dbexplorer.TableOptions{FilterCol: "author_id", FilterVal: "2"})
 			if !strings.Contains(filtered, "Data (1 rows)") || !strings.Contains(filtered, "Excession") ||
 				strings.Contains(filtered, "The Dispossessed") {
 				t.Errorf("filter author_id=2 should show only Excession:\n%s", filtered)
@@ -235,18 +235,18 @@ func TestForeignKeyLinksAndFilter(t *testing.T) {
 			}
 
 			// Unknown filter column is ignored; injection via the column is impossible.
-			all := e.TableHTMLWith("books", dbexplorer.TableOptions{FilterCol: `id" OR 1=1 --`, FilterVal: "x"})
+			all := e.TableHTMLWith(t.Context(), "books", dbexplorer.TableOptions{FilterCol: `id" OR 1=1 --`, FilterVal: "x"})
 			if !strings.Contains(all, "Data (3 rows)") || strings.Contains(all, "Filter:") {
 				t.Error("unknown filter column should be ignored")
 			}
 			// Filter value is a parameter, not SQL.
-			none := e.TableHTMLWith("books", dbexplorer.TableOptions{FilterCol: "title", FilterVal: "' OR 1=1 --"})
+			none := e.TableHTMLWith(t.Context(), "books", dbexplorer.TableOptions{FilterCol: "title", FilterVal: "' OR 1=1 --"})
 			if !strings.Contains(none, "Data (0 rows)") || strings.Contains(none, "Query error") {
 				t.Errorf("filter value must be parameterised:\n%s", none)
 			}
 
 			// Render wires filter/value from the query string.
-			viaURL := e.Render("/books?filter=author_id&value=2")
+			viaURL := e.Render(t.Context(), "/books?filter=author_id&value=2")
 			if !strings.Contains(viaURL, "Data (1 rows)") {
 				t.Error("Render should apply filter/value query params")
 			}
@@ -273,13 +273,13 @@ func TestViewsListedAndAnnotated(t *testing.T) {
 			if views := e.Views(); len(views) != 1 || views[0] != "contract_books" {
 				t.Fatalf("Views() = %v, want [contract_books]", views)
 			}
-			index := e.IndexHTML()
+			index := e.IndexHTML(t.Context())
 			for _, want := range []string{"contract_books", `<span class="tag">contract</span>`, `<span class="tag">internal</span>`} {
 				if !strings.Contains(index, want) {
 					t.Errorf("index missing %q", want)
 				}
 			}
-			page := e.TableHTML("contract_books", 1, "", "", false)
+			page := e.TableHTML(t.Context(), "contract_books", 1, "", "", false)
 			for _, want := range []string{"Excession", "author"} {
 				if !strings.Contains(page, want) {
 					t.Errorf("view page missing %q", want)
@@ -295,7 +295,7 @@ func TestViewsListedAndAnnotated(t *testing.T) {
 func TestSchemaSameOnBothBackends(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
-			page := e.TableHTML("loans", 1, "", "", false)
+			page := e.TableHTML(t.Context(), "loans", 1, "", "", false)
 			for _, want := range []string{
 				"<td>loans_pkey</td><td>id</td><td>YES</td><td>pk</td>",
 				"<td><strong>id</strong></td><td>uuid</td>",
@@ -309,7 +309,7 @@ func TestSchemaSameOnBothBackends(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { e.DB.Exec(`DROP VIEW book_titles`) })
-			if page := e.TableHTML("book_titles", 1, "", "", false); !strings.Contains(page, "Schema (2 columns)") {
+			if page := e.TableHTML(t.Context(), "book_titles", 1, "", "", false); !strings.Contains(page, "Schema (2 columns)") {
 				t.Error("view page should list its 2 columns")
 			}
 		})

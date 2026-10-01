@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"io/fs"
@@ -59,6 +60,6 @@ func (d *demo) explorerFor(rawURL string) *dbexplorer.Explorer {
 }
 
 // Render renders a URL in whichever explorer it belongs to.
-func (d *demo) Render(rawURL string) string {
-	return d.explorerFor(rawURL).Render(rawURL)
+func (d *demo) Render(ctx context.Context, rawURL string) string {
+	return d.explorerFor(rawURL).Render(ctx, rawURL)
 }

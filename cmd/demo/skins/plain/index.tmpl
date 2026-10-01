@@ -2,7 +2,8 @@
 {{define "index" -}}
 {{- if .Component}}<p><a href="{{.AllURL}}">&larr; Whole database</a></p><h2>Component: {{.Component}}</h2>
 {{- else}}<h2>Database</h2>{{end}}
-{{- if .Error}}<p><mark>{{.Error}}</mark></p>
+{{- if .Denied}}<p><mark>Access denied: you may not view the {{.Component}} component.</mark></p>
+{{- else if .Error}}<p><mark>{{.Error}}</mark></p>
 {{- else if not .Tables}}<p>No tables found.</p>
 {{- else -}}
 {{- with .Components}}<p>Components:{{range .}} <a href="{{.URL}}">{{.Text}}</a>{{end}}</p>{{end -}}
@@ -10,7 +11,7 @@
 {{- with .Views}}<h3>Views</h3><ul>{{range .}}{{template "summary" .}}{{end}}</ul>{{end}}
 {{- with .Relationships -}}
 <h3>Relationships</h3><ul>
-{{- range .}}<li><a href="{{.From.URL}}">{{.From.Text}}</a>.{{.FromColumn}} &rarr; <a href="{{.To.URL}}">{{.To.Text}}</a>.{{.ToColumn}}</li>{{end -}}
+{{- range .}}<li><a href="{{.From.URL}}">{{.From.Text}}</a>.{{.FromColumn}} &rarr; {{if .To.URL}}<a href="{{.To.URL}}">{{.To.Text}}</a>{{else}}{{.To.Text}}{{end}}.{{.ToColumn}}</li>{{end -}}
 </ul>
 {{- end}}
 {{- end}}

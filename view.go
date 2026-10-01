@@ -1,6 +1,7 @@
 package dbexplorer
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"slices"
@@ -21,6 +22,7 @@ type Link struct {
 // the database, and the foreign-key relationships between tables.
 type IndexView struct {
 	Error         string // database unavailable, or an unknown component
+	Denied        bool   // the viewer may not see the component in scope
 	Component     string // the component in scope; "" for everything
 	AllURL        string // the unscoped index
 	Components    []Link // with a Catalog and no scope, each component's index
@@ -39,7 +41,7 @@ type TableSummary struct {
 }
 
 // Relationship is one foreign key, from a column of one table to a column
-// of another.
+// of another. To has no URL when the viewer may not see that table.
 type Relationship struct {
 	From, To             Link
 	FromColumn, ToColumn string
@@ -52,6 +54,7 @@ type TableView struct {
 	Component string // the component in scope; "" for everything
 	IndexURL  string // the index of the scope
 	NotFound  bool   // no table or view has this name in the scope
+	Denied    bool   // the viewer may not see this table's component
 	Error     string // database unavailable, or the data query failed
 
 	Columns     []Column
@@ -77,9 +80,10 @@ type Column struct {
 // ForeignKey is a foreign key declared on the table.
 type ForeignKey struct {
 	Column             string
-	References         Link // the referenced table
+	References         Link // the referenced table; no URL when the viewer may not see it
 	ReferencedColumn   string
 	OnUpdate, OnDelete string
+	NoAccess           string // the referenced table's owner, when the viewer may not see it
 }
 
 // TableIndex is an index on the table.
@@ -104,10 +108,12 @@ type Header struct {
 
 // Cell is one data value. When Full is set, Text is a shortened form of it
 // and Full belongs in a tooltip. URL links a foreign-key value to the
-// referenced row.
+// referenced row; when the viewer may not see that row's component, URL is
+// empty and NoAccess names the component.
 type Cell struct {
 	Null            bool
 	Text, Full, URL string
+	NoAccess        string
 }
 
 // Pager links the pages of the data. PrevURL and NextURL are empty at the
@@ -129,7 +135,7 @@ type PageLink struct {
 
 const pageSize = 50
 
-func (e *Explorer) indexView(component string) IndexView {
+func (e *Explorer) indexView(ctx context.Context, component string) IndexView {
 	v := IndexView{Component: component, AllURL: e.indexURL()}
 	if e.DB == nil {
 		v.Error = "Database not available."
@@ -142,19 +148,32 @@ func (e *Explorer) indexView(component string) IndexView {
 			v.Error = "Unknown component: " + component
 			return v
 		}
+		if !e.canView(ctx, component) {
+			v.Denied = true
+			return v
+		}
 		tables = slices.DeleteFunc(tables, func(t string) bool { return !slices.Contains(c.Tables, t) })
 		views = slices.DeleteFunc(views, func(t string) bool { return !slices.Contains(c.Views, t) })
 	} else if e.Catalog != nil {
 		for _, c := range e.Catalog.Components() {
+			if !e.canView(ctx, c.Name) {
+				continue
+			}
 			v.Components = append(v.Components, Link{c.Name, e.indexURLIn(c.Name)})
 		}
 	}
+	hidden := func(name string) bool { return !e.canViewTable(ctx, name) }
+	tables, views = slices.DeleteFunc(tables, hidden), slices.DeleteFunc(views, hidden)
 	for _, name := range tables {
 		v.Tables = append(v.Tables, e.summary(component, name))
 		for _, f := range e.tableFKs(name) {
+			to := Link{Text: f.refTable}
+			if e.canViewTable(ctx, f.refTable) {
+				to.URL = e.tableURLIn(e.scopeFor(component, f.refTable), f.refTable)
+			}
 			v.Relationships = append(v.Relationships, Relationship{
 				From: Link{name, e.tableURLIn(component, name)}, FromColumn: f.fromCol,
-				To: Link{f.refTable, e.tableURLIn(e.scopeFor(component, f.refTable), f.refTable)}, ToColumn: f.toCol,
+				To: to, ToColumn: f.toCol,
 			})
 		}
 	}
@@ -178,7 +197,7 @@ func (e *Explorer) summary(component, name string) TableSummary {
 	return s
 }
 
-func (e *Explorer) tableView(name string, o TableOptions) TableView {
+func (e *Explorer) tableView(ctx context.Context, name string, o TableOptions) TableView {
 	v := TableView{Name: name, Component: o.Component, IndexURL: e.indexURLIn(o.Component)}
 	if e.DB == nil {
 		v.Error = "Database not available."
@@ -194,6 +213,10 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 			return v
 		}
 	}
+	if !e.canViewTable(ctx, name) {
+		v.Denied = true
+		return v
+	}
 
 	var colNames []string
 	for _, c := range e.tableColumns(name) {
@@ -205,9 +228,14 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 	fkByCol := map[string]dbFKInfo{}
 	for _, f := range fks {
 		fkByCol[f.fromCol] = f
-		v.ForeignKeys = append(v.ForeignKeys, ForeignKey{Column: f.fromCol,
-			References: Link{f.refTable, e.tableURLIn(e.scopeFor(o.Component, f.refTable), f.refTable)}, ReferencedColumn: f.toCol,
-			OnUpdate: f.onUpdate, OnDelete: f.onDelete})
+		fk := ForeignKey{Column: f.fromCol, References: Link{Text: f.refTable}, ReferencedColumn: f.toCol,
+			OnUpdate: f.onUpdate, OnDelete: f.onDelete}
+		if e.canViewTable(ctx, f.refTable) {
+			fk.References.URL = e.tableURLIn(e.scopeFor(o.Component, f.refTable), f.refTable)
+		} else {
+			fk.NoAccess = e.owner(f.refTable)
+		}
+		v.ForeignKeys = append(v.ForeignKeys, fk)
 	}
 	for _, ix := range e.tableIndexes(name) {
 		v.Indexes = append(v.Indexes, TableIndex{Name: ix.name, Columns: ix.columns, Unique: ix.unique, Origin: ix.origin})
@@ -286,8 +314,12 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 		for i, val := range vals {
 			row[i] = e.cell(name, cols[i], val, o.Trunc)
 			if f, ok := fkByCol[cols[i]]; ok && val != nil {
-				row[i].URL = e.tableLink(f.refTable, TableOptions{Trunc: o.Trunc, FilterCol: f.toCol, FilterVal: rawText(val),
-					Component: e.scopeFor(o.Component, f.refTable)})
+				if e.canViewTable(ctx, f.refTable) {
+					row[i].URL = e.tableLink(f.refTable, TableOptions{Trunc: o.Trunc, FilterCol: f.toCol, FilterVal: rawText(val),
+						Component: e.scopeFor(o.Component, f.refTable)})
+				} else {
+					row[i].NoAccess = e.owner(f.refTable)
+				}
 			}
 		}
 		v.Rows = append(v.Rows, row)

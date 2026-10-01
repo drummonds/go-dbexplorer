@@ -10,6 +10,7 @@
 package dbexplorer
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"html/template"
@@ -53,6 +54,10 @@ type Explorer struct {
 	// Catalog, when set, divides the database into components and lets the
 	// explorer be scoped to one of them (see Render).
 	Catalog Catalog
+	// Authoriser, when set, decides which components the viewer may see;
+	// nil shows everything. The viewer comes from the context passed to
+	// Render (or the request's, under Handler).
+	Authoriser Authoriser
 }
 
 // TableOptions selects what TableHTMLWith renders for a table.
@@ -81,14 +86,14 @@ func (e *Explorer) indexURL() string {
 // Render renders the page for a URL relative to BasePath: the index for ""
 // or "/", otherwise the table page for "/<table>". With a Catalog,
 // "/c/<component>" and "/c/<component>/<table>" are the same pages scoped
-// to one component. The query string
-// supplies page, sort, dir, trunc, filter and value (see TableOptions). This
-// is the routing-free core used by Handler and by WASM hosts that dispatch
-// navigation themselves.
-func (e *Explorer) Render(rawURL string) string {
+// to one component. The query string supplies page, sort, dir, trunc,
+// filter and value (see TableOptions). ctx is handed to the Authoriser to
+// identify the viewer. This is the routing-free core used by Handler and by
+// WASM hosts that dispatch navigation themselves.
+func (e *Explorer) Render(ctx context.Context, rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return e.IndexHTML()
+		return e.IndexHTML(ctx)
 	}
 	path := strings.Trim(strings.TrimPrefix(u.Path, e.BasePath), "/")
 	component := ""
@@ -96,11 +101,11 @@ func (e *Explorer) Render(rawURL string) string {
 		component, path, _ = strings.Cut(rest, "/")
 	}
 	if path == "" {
-		return e.render("index", e.indexView(component))
+		return e.render("index", e.indexView(ctx, component))
 	}
 	q := u.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
-	return e.TableHTMLWith(path, TableOptions{
+	return e.TableHTMLWith(ctx, path, TableOptions{
 		Page: page, Sort: q.Get("sort"), Dir: q.Get("dir"), Trunc: q.Get("trunc") == "1",
 		FilterCol: q.Get("filter"), FilterVal: q.Get("value"), Component: component,
 	})
@@ -121,7 +126,7 @@ func (e *Explorer) Handler() http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, e.render("page", PageView{
 			Title:   title,
-			Content: template.HTML(e.Render(r.URL.String())),
+			Content: template.HTML(e.Render(r.Context(), r.URL.String())),
 			Footer:  template.HTML(e.Footer),
 		}))
 	})
@@ -286,8 +291,8 @@ func (e *Explorer) tableIndexes(name string) []dbIdxInfo {
 
 // IndexHTML renders the explorer overview: all tables with row/column
 // counts and foreign-key relationships.
-func (e *Explorer) IndexHTML() string {
-	return e.render("index", e.indexView(""))
+func (e *Explorer) IndexHTML(ctx context.Context) string {
+	return e.render("index", e.indexView(ctx, ""))
 }
 
 // truncLen is the display length text cell values are cut to when the
@@ -366,8 +371,8 @@ func (e *Explorer) tableLink(name string, o TableOptions) string {
 // TableHTML renders the detail view for a single table: schema, foreign
 // keys, indexes, and paginated data. It is TableHTMLWith without a filter;
 // trunc shortens text cells to truncLen characters.
-func (e *Explorer) TableHTML(name string, page int, sort string, dir string, trunc bool) string {
-	return e.TableHTMLWith(name, TableOptions{Page: page, Sort: sort, Dir: dir, Trunc: trunc})
+func (e *Explorer) TableHTML(ctx context.Context, name string, page int, sort string, dir string, trunc bool) string {
+	return e.TableHTMLWith(ctx, name, TableOptions{Page: page, Sort: sort, Dir: dir, Trunc: trunc})
 }
 
 // TableHTMLWith renders the detail view for a single table — schema with
@@ -375,6 +380,6 @@ func (e *Explorer) TableHTML(name string, page int, sort string, dir string, tru
 // filtered data — as an HTML fragment. Sort, pagination and filter state is
 // carried through every emitted link. Cells in foreign-key columns link to
 // the referenced table filtered to that key.
-func (e *Explorer) TableHTMLWith(name string, o TableOptions) string {
-	return e.render("table", e.tableView(name, o))
+func (e *Explorer) TableHTMLWith(ctx context.Context, name string, o TableOptions) string {
+	return e.render("table", e.tableView(ctx, name, o))
 }

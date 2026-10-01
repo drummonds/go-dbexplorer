@@ -133,10 +133,10 @@ func TestWASMSoakDataSize(t *testing.T) {
 
 	// The explorer must still browse a table this size.
 	ex := &dbexplorer.Explorer{DB: db}
-	if idx := ex.IndexHTML(); !strings.Contains(idx, "rows") {
+	if idx := ex.IndexHTML(t.Context()); !strings.Contains(idx, "rows") {
 		t.Errorf("IndexHTML does not list the rows table")
 	}
-	if page := ex.TableHTML("rows", 1, "id", "asc", false); !strings.Contains(page, "k-0000000000") {
+	if page := ex.TableHTML(t.Context(), "rows", 1, "id", "asc", false); !strings.Contains(page, "k-0000000000") {
 		t.Errorf("TableHTML page 1 does not show the first row")
 	}
 

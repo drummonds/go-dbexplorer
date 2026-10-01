@@ -5,7 +5,8 @@
 {{- else -}}
 <h2 class="title is-4">DB Explorer</h2>
 {{- end}}
-{{- if .Error}}<p class="has-text-danger">{{.Error}}</p>
+{{- if .Denied}}<p class="has-text-danger">Access denied: you may not view the {{.Component}} component.</p>
+{{- else if .Error}}<p class="has-text-danger">{{.Error}}</p>
 {{- else if not .Tables}}<p class="has-text-grey">No tables found.</p>
 {{- else -}}
 {{- with .Components -}}
@@ -21,7 +22,7 @@
 {{- end}}
 {{- with .Relationships -}}
 <div class="box"><h3 class="title is-5">Relationships</h3><table class="table is-fullwidth is-striped is-narrow"><thead><tr><th>Table</th><th>Column</th><th></th><th>References</th><th>Column</th></tr></thead><tbody>
-{{- range .}}<tr><td><a href="{{.From.URL}}">{{.From.Text}}</a></td><td>{{.FromColumn}}</td><td>&rarr;</td><td><a href="{{.To.URL}}">{{.To.Text}}</a></td><td>{{.ToColumn}}</td></tr>{{end -}}
+{{- range .}}<tr><td><a href="{{.From.URL}}">{{.From.Text}}</a></td><td>{{.FromColumn}}</td><td>&rarr;</td><td>{{if .To.URL}}<a href="{{.To.URL}}">{{.To.Text}}</a>{{else}}{{.To.Text}}{{end}}</td><td>{{.ToColumn}}</td></tr>{{end -}}
 </tbody></table></div>
 {{- end}}
 {{- end}}

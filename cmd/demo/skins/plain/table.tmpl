@@ -2,12 +2,13 @@
 {{define "table" -}}
 <p><a href="{{.IndexURL}}">&larr; {{with .Component}}{{.}}{{else}}All tables{{end}}</a></p>
 {{- if .NotFound}}<h2>No such table</h2><p>There is no table or view called <code>{{.Name}}</code>.</p>
+{{- else if .Denied}}<h2>Access denied</h2><p>You may not view <code>{{.Name}}</code>.</p>
 {{- else if and .Error (not .Columns)}}<p><mark>{{.Error}}</mark></p>
 {{- else -}}
 <h2>{{.Name}}</h2>
 <details><summary>Schema: {{len .Columns}} columns, {{len .ForeignKeys}} foreign keys, {{len .Indexes}} indexes</summary>
 <ul>{{range .Columns}}<li><code>{{.Name}}</code> {{.Type}}{{if .PrimaryKey}} <strong>primary key</strong>{{end}}{{if .NotNull}} not null{{end}}{{with .Default}} default <code>{{.}}</code>{{end}}</li>{{end}}</ul>
-{{- with .ForeignKeys}}<p>References:</p><ul>{{range .}}<li><code>{{.Column}}</code> &rarr; <a href="{{.References.URL}}">{{.References.Text}}</a>.{{.ReferencedColumn}}</li>{{end}}</ul>{{end}}
+{{- with .ForeignKeys}}<p>References:</p><ul>{{range .}}<li><code>{{.Column}}</code> &rarr; {{if .References.URL}}<a href="{{.References.URL}}">{{.References.Text}}</a>{{else}}{{.References.Text}}{{with .NoAccess}} (owned by {{.}}){{end}}{{end}}.{{.ReferencedColumn}}</li>{{end}}</ul>{{end}}
 {{- with .Indexes}}<p>Indexes:</p><ul>{{range .}}<li><code>{{.Name}}</code> ({{.Columns}}){{if .Unique}} unique{{end}}</li>{{end}}</ul>{{end -}}
 </details>
 <h3>{{.TotalRows}} rows</h3>
@@ -26,6 +27,6 @@
 {{define "value" -}}
 {{- if .Null}}<em>null</em>
 {{- else if .URL}}<a href="{{.URL}}"{{with .Full}} title="{{.}}"{{end}}>{{.Text}}{{if .Full}}&hellip;{{end}}</a>
-{{- else}}<span{{with .Full}} title="{{.}}"{{end}}>{{.Text}}{{if .Full}}&hellip;{{end}}</span>
+{{- else}}<span{{with .Full}} title="{{.}}"{{end}}>{{.Text}}{{if .Full}}&hellip;{{end}}</span>{{with .NoAccess}} <small>({{.}})</small>{{end}}
 {{- end}}
 {{- end}}

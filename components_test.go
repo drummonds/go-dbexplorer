@@ -33,7 +33,7 @@ func componentBackends(t *testing.T) map[string]*dbexplorer.Explorer {
 func TestAllComponentsIndex(t *testing.T) {
 	for backend, e := range componentBackends(t) {
 		t.Run(backend, func(t *testing.T) {
-			index := e.Render("/")
+			index := e.Render(t.Context(), "/")
 			for _, want := range []string{
 				`href="/c/catalogue"`, `href="/c/lending"`, // the scopes
 				`href="/books">books</a>`, // tables still browse unscoped
@@ -52,7 +52,7 @@ func TestAllComponentsIndex(t *testing.T) {
 func TestComponentIndex(t *testing.T) {
 	for backend, e := range componentBackends(t) {
 		t.Run(backend, func(t *testing.T) {
-			index := e.Render("/c/catalogue")
+			index := e.Render(t.Context(), "/c/catalogue")
 			for _, want := range []string{`href="/c/catalogue/authors"`, `href="/c/catalogue/books"`, `href="/c/catalogue/contract_books"`, "catalogue"} {
 				if !strings.Contains(index, want) {
 					t.Errorf("catalogue index missing %q", want)
@@ -61,11 +61,11 @@ func TestComponentIndex(t *testing.T) {
 			if strings.Contains(index, ">loans</a>") {
 				t.Error("catalogue index lists lending's loans")
 			}
-			lending := e.Render("/c/lending")
+			lending := e.Render(t.Context(), "/c/lending")
 			if !strings.Contains(lending, `href="/c/lending/loans"`) || strings.Contains(lending, ">authors</a>") || strings.Contains(lending, ">contract_books</a>") {
 				t.Errorf("lending index should list only loans: %.500s", lending)
 			}
-			if !strings.Contains(e.Render("/c/nope"), "Unknown component") {
+			if !strings.Contains(e.Render(t.Context(), "/c/nope"), "Unknown component") {
 				t.Error("an unknown component should say so")
 			}
 		})
@@ -75,7 +75,7 @@ func TestComponentIndex(t *testing.T) {
 func TestComponentTable(t *testing.T) {
 	for backend, e := range componentBackends(t) {
 		t.Run(backend, func(t *testing.T) {
-			books := e.Render("/c/catalogue/books?sort=title&dir=asc")
+			books := e.Render(t.Context(), "/c/catalogue/books?sort=title&dir=asc")
 			for _, want := range []string{
 				"Table: books",
 				`href="/c/catalogue"`, // back to the component, not everything
@@ -86,11 +86,11 @@ func TestComponentTable(t *testing.T) {
 					t.Errorf("scoped books page missing %q", want)
 				}
 			}
-			loans := e.Render("/c/lending/loans")
+			loans := e.Render(t.Context(), "/c/lending/loans")
 			if !strings.Contains(loans, `href="/c/catalogue/books?filter=id&amp;value=1"`) {
 				t.Error("an FK into another component should link into that component's scope")
 			}
-			if !strings.Contains(e.Render("/c/lending/books"), "Table Not Found") {
+			if !strings.Contains(e.Render(t.Context(), "/c/lending/books"), "Table Not Found") {
 				t.Error("a table outside the component should not be browsable in its scope")
 			}
 		})
@@ -101,10 +101,10 @@ func TestComponentTable(t *testing.T) {
 func TestNoCatalogNoScopes(t *testing.T) {
 	for backend, e := range backends(t) {
 		t.Run(backend, func(t *testing.T) {
-			if strings.Contains(e.Render("/"), `href="/c/`) {
+			if strings.Contains(e.Render(t.Context(), "/"), `href="/c/`) {
 				t.Error("index links component scopes without a catalog")
 			}
-			if !strings.Contains(e.Render("/c/catalogue"), "Table Not Found") {
+			if !strings.Contains(e.Render(t.Context(), "/c/catalogue"), "Table Not Found") {
 				t.Error("/c/... without a catalog should be an unknown table")
 			}
 		})

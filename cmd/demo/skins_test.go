@@ -40,23 +40,23 @@ func TestDemoRoutesBySkin(t *testing.T) {
 // are records, and its links stay inside the plain explorer.
 func TestPlainSkin(t *testing.T) {
 	d := newDemo(demoDB(t), 8, "2006-01-02 15:04")
-	index := d.Render("/plain")
+	index := d.Render(t.Context(), "/plain")
 	if !strings.Contains(index, `href="/plain/books"`) || strings.Contains(index, `class="box"`) {
 		t.Errorf("plain index: %.400s", index)
 	}
-	books := d.Render("/plain/books?sort=title&dir=asc")
+	books := d.Render(t.Context(), "/plain/books?sort=title&dir=asc")
 	for _, want := range []string{"<article", "<dl>", `href="/plain/authors?filter=id&amp;value=`, "Ancillary Justice"} {
 		if !strings.Contains(books, want) {
 			t.Errorf("plain books page missing %q", want)
 		}
 	}
-	if loans := d.Render("/plain/loans?page=2"); !strings.Contains(loans, "Page 2 of 3") || !strings.Contains(loans, `href="/plain/loans?page=3"`) {
+	if loans := d.Render(t.Context(), "/plain/loans?page=2"); !strings.Contains(loans, "Page 2 of 3") || !strings.Contains(loans, `href="/plain/loans?page=3"`) {
 		t.Error("plain loans page should page through 120 rows")
 	}
 	if strings.Contains(books, `class="table`) {
 		t.Error("plain books page carries Bulma markup")
 	}
-	if !strings.Contains(d.Render("/books"), `class="box"`) {
+	if !strings.Contains(d.Render(t.Context(), "/books"), `class="box"`) {
 		t.Error("the default explorer should keep the Bulma skin")
 	}
 }
@@ -67,11 +67,11 @@ func TestPlainSkin(t *testing.T) {
 func TestDemoComponents(t *testing.T) {
 	d := newDemo(demoDB(t), 8, "2006-01-02 15:04")
 	for _, base := range []string{"", plainBase} {
-		index := d.Render(base + "/")
+		index := d.Render(t.Context(), base+"/")
 		if !strings.Contains(index, `href="`+base+`/c/catalogue"`) || !strings.Contains(index, `href="`+base+`/c/lending"`) {
 			t.Errorf("%s index does not link the components", base)
 		}
-		catalogue := d.Render(base + "/c/catalogue")
+		catalogue := d.Render(t.Context(), base+"/c/catalogue")
 		for _, want := range []string{">authors</a>", ">books</a>", ">contract_books</a>"} {
 			if !strings.Contains(catalogue, want) {
 				t.Errorf("%s catalogue scope missing %q", base, want)
@@ -80,7 +80,7 @@ func TestDemoComponents(t *testing.T) {
 		if strings.Contains(catalogue, ">loans</a>") {
 			t.Errorf("%s catalogue scope lists loans", base)
 		}
-		if loans := d.Render(base + "/c/lending/loans"); !strings.Contains(loans, `href="`+base+`/c/catalogue/books?filter=id&amp;value=`) {
+		if loans := d.Render(t.Context(), base+"/c/lending/loans"); !strings.Contains(loans, `href="`+base+`/c/catalogue/books?filter=id&amp;value=`) {
 			t.Errorf("%s loans' book_id should link into the catalogue scope", base)
 		}
 	}

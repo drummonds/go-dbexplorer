@@ -2,6 +2,8 @@
 {{define "table" -}}
 {{- if .NotFound -}}
 <h2 class="title is-4">Table Not Found</h2><p class="has-text-danger">Unknown table: {{.Name}}</p><p><a href="{{.IndexURL}}">&larr; Back to explorer</a></p>
+{{- else if .Denied -}}
+<h2 class="title is-4">Access Denied</h2><p class="has-text-danger">Access denied: you may not view {{.Name}}.</p><p><a href="{{.IndexURL}}">&larr; Back to {{or .Component "explorer"}}</a></p>
 {{- else if and .Error (not .Columns) -}}
 <p class="has-text-danger">{{.Error}}</p>
 {{- else -}}
@@ -16,7 +18,7 @@
 {{- else}}<p class="has-text-danger">Schema not available.</p>{{end}}
 {{- with .ForeignKeys -}}
 <details class="mt-4"><summary class="title is-6" style="cursor:pointer">Foreign Keys ({{len .}})</summary><table class="table is-fullwidth is-striped is-narrow"><thead><tr><th>Column</th><th>References</th><th>Column</th><th>On Update</th><th>On Delete</th></tr></thead><tbody>
-{{- range .}}<tr><td>{{.Column}}</td><td><a href="{{.References.URL}}">{{.References.Text}}</a></td><td>{{.ReferencedColumn}}</td><td>{{.OnUpdate}}</td><td>{{.OnDelete}}</td></tr>{{end -}}
+{{- range .}}<tr><td>{{.Column}}</td><td>{{if .References.URL}}<a href="{{.References.URL}}">{{.References.Text}}</a>{{else}}{{.References.Text}}{{with .NoAccess}} <span class="tag is-light">{{.}}</span>{{end}}{{end}}</td><td>{{.ReferencedColumn}}</td><td>{{.OnUpdate}}</td><td>{{.OnDelete}}</td></tr>{{end -}}
 </tbody></table></details>
 {{- end}}
 {{- with .Indexes -}}
@@ -57,7 +59,7 @@
 {{- /* One data cell. Data: Cell. */ -}}
 {{define "cell" -}}
 {{- if .Null}}<td class="has-text-grey-light">NULL</td>
-{{- else}}<td{{with .Full}} title="{{.}}"{{end}}>{{if .URL}}<a href="{{.URL}}">{{template "cell-text" .}}</a>{{else}}{{template "cell-text" .}}{{end}}</td>
+{{- else}}<td{{with .Full}} title="{{.}}"{{end}}>{{if .URL}}<a href="{{.URL}}">{{template "cell-text" .}}</a>{{else}}{{template "cell-text" .}}{{end}}{{with .NoAccess}} <span class="tag is-light">{{.}}</span>{{end}}</td>
 {{- end}}
 {{- end}}
 

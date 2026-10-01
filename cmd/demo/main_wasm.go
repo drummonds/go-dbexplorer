@@ -8,6 +8,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"syscall/js"
@@ -29,7 +30,7 @@ func main() {
 		if len(args) > 0 {
 			url = args[0].String()
 		}
-		return d.Render(url)
+		return d.Render(context.Background(), url)
 	}))
 
 	js.Global().Set("goVersion", js.FuncOf(func(this js.Value, args []js.Value) any {
