@@ -60,3 +60,28 @@ func TestPlainSkin(t *testing.T) {
 		t.Error("the default explorer should keep the Bulma skin")
 	}
 }
+
+// The demo library is two components: the catalogue (authors, books, and
+// the contract_books view it publishes) and lending (members, loans).
+// Both skins browse it per component.
+func TestDemoComponents(t *testing.T) {
+	d := newDemo(demoDB(t), 8, "2006-01-02 15:04")
+	for _, base := range []string{"", plainBase} {
+		index := d.Render(base + "/")
+		if !strings.Contains(index, `href="`+base+`/c/catalogue"`) || !strings.Contains(index, `href="`+base+`/c/lending"`) {
+			t.Errorf("%s index does not link the components", base)
+		}
+		catalogue := d.Render(base + "/c/catalogue")
+		for _, want := range []string{">authors</a>", ">books</a>", ">contract_books</a>"} {
+			if !strings.Contains(catalogue, want) {
+				t.Errorf("%s catalogue scope missing %q", base, want)
+			}
+		}
+		if strings.Contains(catalogue, ">loans</a>") {
+			t.Errorf("%s catalogue scope lists loans", base)
+		}
+		if loans := d.Render(base + "/c/lending/loans"); !strings.Contains(loans, `href="`+base+`/c/catalogue/books?filter=id&amp;value=`) {
+			t.Errorf("%s loans' book_id should link into the catalogue scope", base)
+		}
+	}
+}

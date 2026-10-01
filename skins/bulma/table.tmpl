@@ -5,7 +5,7 @@
 {{- else if and .Error (not .Columns) -}}
 <p class="has-text-danger">{{.Error}}</p>
 {{- else -}}
-<h2 class="title is-4">Table: {{.Name}}</h2><p class="mb-4"><a href="{{.IndexURL}}">&larr; Back to explorer</a></p>
+<h2 class="title is-4">Table: {{.Name}}{{with .Component}} <span class="tag is-light">{{.}}</span>{{end}}</h2><p class="mb-4"><a href="{{.IndexURL}}">&larr; Back to {{or .Component "explorer"}}</a></p>
 {{- /* Schema is a closed master <details>; FKs and indexes nest inside it.
      Native <details> keeps this JS-free in Handler pages and WASM hosts. */ -}}
 <details class="box"><summary class="title is-5" style="cursor:pointer">Schema ({{len .Columns}} columns)</summary>

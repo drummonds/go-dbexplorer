@@ -20,7 +20,10 @@ type Link struct {
 // IndexView is rendered by the "index" template: the tables and views of
 // the database, and the foreign-key relationships between tables.
 type IndexView struct {
-	Error         string // set when the database is unavailable
+	Error         string // database unavailable, or an unknown component
+	Component     string // the component in scope; "" for everything
+	AllURL        string // the unscoped index
+	Components    []Link // with a Catalog and no scope, each component's index
 	Tables, Views []TableSummary
 	Relationships []Relationship
 }
@@ -29,6 +32,7 @@ type IndexView struct {
 type TableSummary struct {
 	Name, URL   string
 	Annotation  template.HTML // the host's Annotate fragment, trusted HTML
+	Owner       Link          // the owning component's index; empty when unowned or scoped
 	Columns     int
 	Rows        int
 	CountFailed bool // the row count query failed; Rows is meaningless
@@ -44,10 +48,11 @@ type Relationship struct {
 // TableView is rendered by the "table" template: one table's schema, keys
 // and indexes, then a page of its data.
 type TableView struct {
-	Name     string
-	IndexURL string
-	NotFound bool   // no table or view has this name
-	Error    string // database unavailable, or the data query failed
+	Name      string
+	Component string // the component in scope; "" for everything
+	IndexURL  string // the index of the scope
+	NotFound  bool   // no table or view has this name in the scope
+	Error     string // database unavailable, or the data query failed
 
 	Columns     []Column
 	ForeignKeys []ForeignKey
@@ -124,30 +129,48 @@ type PageLink struct {
 
 const pageSize = 50
 
-func (e *Explorer) indexView() IndexView {
+func (e *Explorer) indexView(component string) IndexView {
+	v := IndexView{Component: component, AllURL: e.indexURL()}
 	if e.DB == nil {
-		return IndexView{Error: "Database not available."}
+		v.Error = "Database not available."
+		return v
 	}
-	var v IndexView
-	for _, name := range e.Tables() {
-		v.Tables = append(v.Tables, e.summary(name))
+	tables, views := e.Tables(), e.Views()
+	if component != "" {
+		c, ok := e.component(component)
+		if !ok {
+			v.Error = "Unknown component: " + component
+			return v
+		}
+		tables = slices.DeleteFunc(tables, func(t string) bool { return !slices.Contains(c.Tables, t) })
+		views = slices.DeleteFunc(views, func(t string) bool { return !slices.Contains(c.Views, t) })
+	} else if e.Catalog != nil {
+		for _, c := range e.Catalog.Components() {
+			v.Components = append(v.Components, Link{c.Name, e.indexURLIn(c.Name)})
+		}
+	}
+	for _, name := range tables {
+		v.Tables = append(v.Tables, e.summary(component, name))
 		for _, f := range e.tableFKs(name) {
 			v.Relationships = append(v.Relationships, Relationship{
-				From: Link{name, e.tableURL(name)}, FromColumn: f.fromCol,
-				To: Link{f.refTable, e.tableURL(f.refTable)}, ToColumn: f.toCol,
+				From: Link{name, e.tableURLIn(component, name)}, FromColumn: f.fromCol,
+				To: Link{f.refTable, e.tableURLIn(e.scopeFor(component, f.refTable), f.refTable)}, ToColumn: f.toCol,
 			})
 		}
 	}
-	for _, name := range e.Views() {
-		v.Views = append(v.Views, e.summary(name))
+	for _, name := range views {
+		v.Views = append(v.Views, e.summary(component, name))
 	}
 	return v
 }
 
-func (e *Explorer) summary(name string) TableSummary {
-	s := TableSummary{Name: name, URL: e.tableURL(name), Columns: len(e.tableColumns(name))}
+func (e *Explorer) summary(component, name string) TableSummary {
+	s := TableSummary{Name: name, URL: e.tableURLIn(component, name), Columns: len(e.tableColumns(name))}
 	if e.Annotate != nil {
 		s.Annotation = template.HTML(e.Annotate(name))
+	}
+	if owner := e.owner(name); owner != "" && component == "" {
+		s.Owner = Link{owner, e.indexURLIn(owner)}
 	}
 	if err := e.DB.QueryRow(fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, name)).Scan(&s.Rows); err != nil {
 		s.CountFailed = true
@@ -156,7 +179,7 @@ func (e *Explorer) summary(name string) TableSummary {
 }
 
 func (e *Explorer) tableView(name string, o TableOptions) TableView {
-	v := TableView{Name: name, IndexURL: e.indexURL()}
+	v := TableView{Name: name, Component: o.Component, IndexURL: e.indexURLIn(o.Component)}
 	if e.DB == nil {
 		v.Error = "Database not available."
 		return v
@@ -164,6 +187,12 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 	if !slices.Contains(e.Tables(), name) && !slices.Contains(e.Views(), name) {
 		v.NotFound = true
 		return v
+	}
+	if o.Component != "" {
+		if c, ok := e.component(o.Component); !ok || !slices.Contains(c.Tables, name) && !slices.Contains(c.Views, name) {
+			v.NotFound = true
+			return v
+		}
 	}
 
 	var colNames []string
@@ -177,7 +206,7 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 	for _, f := range fks {
 		fkByCol[f.fromCol] = f
 		v.ForeignKeys = append(v.ForeignKeys, ForeignKey{Column: f.fromCol,
-			References: Link{f.refTable, e.tableURL(f.refTable)}, ReferencedColumn: f.toCol,
+			References: Link{f.refTable, e.tableURLIn(e.scopeFor(o.Component, f.refTable), f.refTable)}, ReferencedColumn: f.toCol,
 			OnUpdate: f.onUpdate, OnDelete: f.onDelete})
 	}
 	for _, ix := range e.tableIndexes(name) {
@@ -207,7 +236,7 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 	page := min(max(o.Page, 1), totalPages)
 
 	// cur is the effective state every link on this page is derived from.
-	cur := TableOptions{Page: page, Sort: sort, Dir: dir, Trunc: o.Trunc, FilterCol: filterCol, FilterVal: filterVal}
+	cur := TableOptions{Page: page, Sort: sort, Dir: dir, Trunc: o.Trunc, FilterCol: filterCol, FilterVal: filterVal, Component: o.Component}
 
 	if filterCol != "" {
 		clear := cur
@@ -257,7 +286,8 @@ func (e *Explorer) tableView(name string, o TableOptions) TableView {
 		for i, val := range vals {
 			row[i] = e.cell(name, cols[i], val, o.Trunc)
 			if f, ok := fkByCol[cols[i]]; ok && val != nil {
-				row[i].URL = e.tableLink(f.refTable, TableOptions{Trunc: o.Trunc, FilterCol: f.toCol, FilterVal: rawText(val)})
+				row[i].URL = e.tableLink(f.refTable, TableOptions{Trunc: o.Trunc, FilterCol: f.toCol, FilterVal: rawText(val),
+					Component: e.scopeFor(o.Component, f.refTable)})
 			}
 		}
 		v.Rows = append(v.Rows, row)

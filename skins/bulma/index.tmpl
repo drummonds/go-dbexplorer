@@ -1,9 +1,16 @@
 {{- /* Built-in Bulma skin: the explorer overview. Data: IndexView. */ -}}
 {{define "index" -}}
+{{- if .Component -}}
+<h2 class="title is-4">DB Explorer: {{.Component}}</h2><p class="mb-4"><a href="{{.AllURL}}">&larr; All components</a></p>
+{{- else -}}
 <h2 class="title is-4">DB Explorer</h2>
+{{- end}}
 {{- if .Error}}<p class="has-text-danger">{{.Error}}</p>
 {{- else if not .Tables}}<p class="has-text-grey">No tables found.</p>
 {{- else -}}
+{{- with .Components -}}
+<div class="box"><h3 class="title is-5">Components</h3><div class="tags">{{range .}}<a class="tag is-link is-light" href="{{.URL}}">{{.Text}}</a>{{end}}</div></div>
+{{- end -}}
 <div class="box"><h3 class="title is-5">Tables</h3><table class="table is-fullwidth is-striped"><thead><tr><th>Table</th><th class="has-text-right">Columns</th><th class="has-text-right">Rows</th></tr></thead><tbody>
 {{- range .Tables}}{{template "summary" .}}{{end -}}
 </tbody></table></div>
@@ -22,5 +29,5 @@
 
 {{- /* One table or view row of the index. Data: TableSummary. */ -}}
 {{define "summary" -}}
-<tr><td><a href="{{.URL}}">{{.Name}}</a>{{with .Annotation}} {{.}}{{end}}</td><td class="has-text-right">{{.Columns}}</td><td class="has-text-right">{{if .CountFailed}}error{{else}}{{.Rows}}{{end}}</td></tr>
+<tr><td><a href="{{.URL}}">{{.Name}}</a>{{with .Owner.Text}} <a class="tag is-light" href="{{$.Owner.URL}}">{{.}}</a>{{end}}{{with .Annotation}} {{.}}{{end}}</td><td class="has-text-right">{{.Columns}}</td><td class="has-text-right">{{if .CountFailed}}error{{else}}{{.Rows}}{{end}}</td></tr>
 {{- end}}

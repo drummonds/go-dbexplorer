@@ -72,6 +72,28 @@ string carries `page`, `sort`, `dir`, `trunc`, and `filter`/`value`.
 - **Truncate toggle.** The per-page `trunc=1` option additionally cuts any
   text cell to 10 characters.
 
+### Components
+
+A `Catalog` divides the database into components, each owning some tables
+and publishing contract views for the others to read. With one set, the
+explorer can be scoped to a single component:
+
+```go
+ex.Catalog = dbexplorer.StaticCatalog{
+    {Name: "catalogue", Tables: []string{"authors", "books"}, Views: []string{"contract_books"}},
+    {Name: "lending", Tables: []string{"members", "loans"}},
+}
+```
+
+`/c/catalogue` lists only that component's tables and the views it
+publishes, and `/c/catalogue/books` browses a table within the scope; a
+table outside the component is not found there. Links stay in the scope,
+except a foreign key into another component's table, which links into that
+component's scope. The unscoped index lists the components and tags each
+table with its owner. `Catalog` is an interface, so the components can
+come from code or from the database itself. Without a catalog, `/c/…` has
+no special meaning.
+
 ### Skins
 
 A skin is three templates over exported view models: `index`
@@ -100,7 +122,8 @@ and shows each data row as a record rather than a table row. `Annotate` and
 
 The demo explores a sample lending-library database (authors, books,
 members, loans — UUID keys, foreign keys and indexes included), on any of
-the backends, through two skins: the built-in Bulma one at `/` and the
+the backends, divided into two components (catalogue and lending), through
+two skins: the built-in Bulma one at `/` and the
 demo's plain skin at `/plain`:
 
 ```sh

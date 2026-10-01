@@ -50,6 +50,9 @@ type Explorer struct {
 	// Skin is the set of templates pages render through (see ParseSkin).
 	// Nil uses the built-in Bulma skin.
 	Skin *Skin
+	// Catalog, when set, divides the database into components and lets the
+	// explorer be scoped to one of them (see Render).
+	Catalog Catalog
 }
 
 // TableOptions selects what TableHTMLWith renders for a table.
@@ -62,10 +65,10 @@ type TableOptions struct {
 	// of the table, otherwise no filter is applied. Foreign-key cells link to
 	// the referenced table with this filter set to the key.
 	FilterCol, FilterVal string
-}
-
-func (e *Explorer) tableURL(name string) string {
-	return e.BasePath + "/" + url.PathEscape(name)
+	// Component scopes the page to one component of the Catalog: only its
+	// tables and views are browsable, and links stay in the scope unless
+	// they lead to another component's table. Empty means everything.
+	Component string
 }
 
 func (e *Explorer) indexURL() string {
@@ -76,7 +79,9 @@ func (e *Explorer) indexURL() string {
 }
 
 // Render renders the page for a URL relative to BasePath: the index for ""
-// or "/", otherwise the table page for "/<table>". The query string
+// or "/", otherwise the table page for "/<table>". With a Catalog,
+// "/c/<component>" and "/c/<component>/<table>" are the same pages scoped
+// to one component. The query string
 // supplies page, sort, dir, trunc, filter and value (see TableOptions). This
 // is the routing-free core used by Handler and by WASM hosts that dispatch
 // navigation themselves.
@@ -85,20 +90,19 @@ func (e *Explorer) Render(rawURL string) string {
 	if err != nil {
 		return e.IndexHTML()
 	}
-	name := strings.Trim(strings.TrimPrefix(u.Path, e.BasePath), "/")
-	if name != "" {
-		if unescaped, err := url.PathUnescape(name); err == nil {
-			name = unescaped
-		}
+	path := strings.Trim(strings.TrimPrefix(u.Path, e.BasePath), "/")
+	component := ""
+	if rest, ok := strings.CutPrefix(path, "c/"); ok && e.Catalog != nil {
+		component, path, _ = strings.Cut(rest, "/")
 	}
-	if name == "" {
-		return e.IndexHTML()
+	if path == "" {
+		return e.render("index", e.indexView(component))
 	}
 	q := u.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
-	return e.TableHTMLWith(name, TableOptions{
+	return e.TableHTMLWith(path, TableOptions{
 		Page: page, Sort: q.Get("sort"), Dir: q.Get("dir"), Trunc: q.Get("trunc") == "1",
-		FilterCol: q.Get("filter"), FilterVal: q.Get("value"),
+		FilterCol: q.Get("filter"), FilterVal: q.Get("value"), Component: component,
 	})
 }
 
@@ -283,7 +287,7 @@ func (e *Explorer) tableIndexes(name string) []dbIdxInfo {
 // IndexHTML renders the explorer overview: all tables with row/column
 // counts and foreign-key relationships.
 func (e *Explorer) IndexHTML() string {
-	return e.render("index", e.indexView())
+	return e.render("index", e.indexView(""))
 }
 
 // truncLen is the display length text cell values are cut to when the
@@ -354,9 +358,9 @@ func (e *Explorer) tableLink(name string, o TableOptions) string {
 		q.Set("value", o.FilterVal)
 	}
 	if len(q) == 0 {
-		return e.tableURL(name)
+		return e.tableURLIn(o.Component, name)
 	}
-	return e.tableURL(name) + "?" + q.Encode()
+	return e.tableURLIn(o.Component, name) + "?" + q.Encode()
 }
 
 // TableHTML renders the detail view for a single table: schema, foreign

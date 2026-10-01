@@ -86,6 +86,11 @@ async function main() {
 	assert(plainBooks.includes('Ancillary Justice'), 'plain skin shows the same data');
 	assert(plainBooks.includes('href="/plain/authors?filter=id&amp;value='), 'plain skin links stay in the plain explorer');
 
+	// Components: lending's loans link book_id into the catalogue's scope.
+	const lending = goRender('/c/lending/loans');
+	assert(lending.includes('Table: loans'), 'loans browse in the lending scope');
+	assert(lending.includes('href="/c/catalogue/books?filter=id&amp;value='), 'cross-component FK links into the catalogue scope');
+
 	const missing = goRender('/no_such_table');
 	assert(missing.includes('Table Not Found'), 'unknown table handled');
 

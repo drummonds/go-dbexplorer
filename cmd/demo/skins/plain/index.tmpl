@@ -1,9 +1,11 @@
 {{- /* Plain skin: the overview as lists. Data: IndexView. */ -}}
 {{define "index" -}}
-<h2>Database</h2>
+{{- if .Component}}<p><a href="{{.AllURL}}">&larr; Whole database</a></p><h2>Component: {{.Component}}</h2>
+{{- else}}<h2>Database</h2>{{end}}
 {{- if .Error}}<p><mark>{{.Error}}</mark></p>
 {{- else if not .Tables}}<p>No tables found.</p>
 {{- else -}}
+{{- with .Components}}<p>Components:{{range .}} <a href="{{.URL}}">{{.Text}}</a>{{end}}</p>{{end -}}
 <h3>Tables</h3><ul>{{range .Tables}}{{template "summary" .}}{{end}}</ul>
 {{- with .Views}}<h3>Views</h3><ul>{{range .}}{{template "summary" .}}{{end}}</ul>{{end}}
 {{- with .Relationships -}}
@@ -15,5 +17,5 @@
 {{- end}}
 
 {{define "summary" -}}
-<li><a href="{{.URL}}">{{.Name}}</a> <small>{{if .CountFailed}}count failed{{else}}{{.Rows}} rows{{end}}, {{.Columns}} columns</small>{{with .Annotation}} {{.}}{{end}}</li>
+<li><a href="{{.URL}}">{{.Name}}</a> <small>{{if .CountFailed}}count failed{{else}}{{.Rows}} rows{{end}}, {{.Columns}} columns{{with .Owner.Text}}, owned by <a href="{{$.Owner.URL}}">{{.}}</a>{{end}}</small>{{with .Annotation}} {{.}}{{end}}</li>
 {{- end}}

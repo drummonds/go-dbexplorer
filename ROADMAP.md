@@ -15,7 +15,7 @@ defines small interfaces and the host supplies them.
       can override (an `fs.FS`); behaviour-preserving. The sample app ships
       two skins — Bulma (default) and a deliberately different second one.
       Trade-off accepted: the view models become public API.
-- [ ] Components: a `Catalog` interface (component → tables, contract views);
+- [x] (unreleased) Components: a `Catalog` interface (component → tables, contract views);
       scope in the URL (`/c/{component}/…` vs all). A component view shows its
       own tables plus the contract views it publishes; a cross-component FK
       links into the target component's scope if authorised, otherwise plain

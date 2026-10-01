@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   (`IndexView`, `TableView`, `PageView` and their parts). `ParseSkin(fsys)`
   layers a host's `*.tmpl` files over the built-in Bulma skin, so a host
   overrides only the templates it needs; set it as `Explorer.Skin`.
+- Components. `Explorer.Catalog` (a `Catalog` interface; `StaticCatalog`
+  for components fixed in code) divides the database into components that
+  own tables and publish contract views. `/c/{component}` and
+  `/c/{component}/{table}` scope the explorer to one component; foreign
+  keys into another component link into its scope. The unscoped index
+  lists the components and tags each table with its owner.
+  `TableOptions.Component` scopes `TableHTMLWith`.
+- The demo library is split into catalogue and lending components, with a
+  `contract_books` view, and both skins browse it per component.
 - The demo explores the same database through two skins: Bulma at `/` and a
   plain, classless skin at `/plain` that shows data rows as records. The
   WASM demo switches skin and stylesheet by URL.

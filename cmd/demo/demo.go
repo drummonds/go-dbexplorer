@@ -19,6 +19,14 @@ var plainFS embed.FS
 // plainBase is where the plain-skinned explorer is mounted.
 const plainBase = "/plain"
 
+// library is the sample database's components: the catalogue owns the
+// books and their authors and publishes contract_books; lending owns the
+// members and their loans, whose book_id reaches into the catalogue.
+var library = dbexplorer.StaticCatalog{
+	{Name: "catalogue", Tables: []string{"authors", "books"}, Views: []string{"contract_books"}},
+	{Name: "lending", Tables: []string{"members", "loans"}},
+}
+
 // demo is the same database explored through two skins: the built-in
 // Bulma skin at /, and the plain skin at /plain.
 type demo struct {
@@ -35,8 +43,8 @@ func newDemo(db *sql.DB, uuidLen int, timeFormat string) *demo {
 		panic(err) // the embedded skin is fixed at build time; tests catch a bad one
 	}
 	return &demo{
-		bulma: &dbexplorer.Explorer{DB: db, UUIDLen: uuidLen, TimeFormat: timeFormat},
-		plain: &dbexplorer.Explorer{DB: db, UUIDLen: uuidLen, TimeFormat: timeFormat,
+		bulma: &dbexplorer.Explorer{DB: db, UUIDLen: uuidLen, TimeFormat: timeFormat, Catalog: library},
+		plain: &dbexplorer.Explorer{DB: db, UUIDLen: uuidLen, TimeFormat: timeFormat, Catalog: library,
 			BasePath: plainBase, Skin: skin},
 	}
 }

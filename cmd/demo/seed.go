@@ -67,6 +67,12 @@ func seedSampleDB(db *sql.DB) {
 			return
 		}
 	}
+	// The catalogue component's contract view: books as other components
+	// may read them. Plain CREATE VIEW (pglike has no OR REPLACE, PostgreSQL
+	// no IF NOT EXISTS), so a view left from an earlier seed only logs.
+	if _, err := db.Exec(`CREATE VIEW contract_books AS SELECT id, title, author_id, isbn FROM books`); err != nil {
+		log.Printf("seed view: %v", err)
+	}
 
 	rng := rand.New(rand.NewPCG(20260902, 1))
 

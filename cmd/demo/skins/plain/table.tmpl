@@ -1,6 +1,6 @@
 {{- /* Plain skin: one table, its rows as records. Data: TableView. */ -}}
 {{define "table" -}}
-<p><a href="{{.IndexURL}}">&larr; All tables</a></p>
+<p><a href="{{.IndexURL}}">&larr; {{with .Component}}{{.}}{{else}}All tables{{end}}</a></p>
 {{- if .NotFound}}<h2>No such table</h2><p>There is no table or view called <code>{{.Name}}</code>.</p>
 {{- else if and .Error (not .Columns)}}<p><mark>{{.Error}}</mark></p>
 {{- else -}}
