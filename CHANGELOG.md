@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-01
+
+ - Access control: an Authoriser per component; rendering takes a ctx
+
 ### Added
 - Access control. `Explorer.Authoriser` (an `Authoriser` interface;
   `AuthoriserFunc` adapts a function) decides per component what the
