@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-01
+
+ - Skins and components: templates over view models, per-component scopes
+
 ### Added
 - Skins. Pages render through `html/template`s over exported view models
   (`IndexView`, `TableView`, `PageView` and their parts). `ParseSkin(fsys)`
